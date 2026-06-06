@@ -771,12 +771,22 @@ async function doLogin() {
   if (!emailOrId || !pass) return showAuthError('Please enter your credentials.');
   setBtn('login-btn', true, '<i class="fas fa-circle-notch fa-spin"></i> Signing in...');
 
-  // Admin local login
+  // Admin local login — sign in anonymously so Firestore auth works
   if (tryAdminLogin(emailOrId, pass)) {
-    currentUser = { uid: ADMIN_UID, name: 'Admin', email: 'admin@mhlab.local', role: 'admin' };
-    sessionStorage.setItem('mhlab_admin', JSON.stringify(currentUser));
-    document.getElementById('user-name-display').textContent = 'Admin';
-    await loadDataThenRender();
+    try {
+      await fbAuth.signInAnonymously();
+      // onAuthStateChanged will fire, but we intercept it with adminSession
+      currentUser = { uid: ADMIN_UID, name: 'Admin', email: 'admin@mhlab.local', role: 'admin' };
+      sessionStorage.setItem('mhlab_admin', JSON.stringify(currentUser));
+      document.getElementById('user-name-display').textContent = 'Admin';
+      await loadDataThenRender();
+    } catch(e) {
+      // If anonymous auth fails, proceed anyway
+      currentUser = { uid: ADMIN_UID, name: 'Admin', email: 'admin@mhlab.local', role: 'admin' };
+      sessionStorage.setItem('mhlab_admin', JSON.stringify(currentUser));
+      document.getElementById('user-name-display').textContent = 'Admin';
+      await loadDataThenRender();
+    }
     return;
   }
 
