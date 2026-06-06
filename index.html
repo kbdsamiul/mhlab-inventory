@@ -9,75 +9,12 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
-<!-- Firebase SDKs -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import {
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    sendEmailVerification, signOut, onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import {
-    getFirestore, doc, getDoc, setDoc
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  // ============================================================
-  // FIREBASE CONFIG — replace with your own project config
-  // Get it from: https://console.firebase.google.com
-  // Project Settings > Your Apps > Web App > Config
-  // ============================================================
-  const firebaseConfig = {
-    apiKey: "AIzaSyAVoFD-f-aXRdpUuOC7zv9KzBA19n__vlg",
-    authDomain: "mhlab-inventory.firebaseapp.com",
-    projectId: "mhlab-inventory",
-    storageBucket: "mhlab-inventory.firebasestorage.app",
-    messagingSenderId: "890657571551",
-    appId: "1:890657571551:web:fe2d98b875192b72831f6a"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  // Expose to global scope so non-module scripts can use them
-  window._firebaseAuth = auth;
-  window._firebaseDb = db;
-  window._firebaseFns = {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    sendEmailVerification,
-    signOut,
-    onAuthStateChanged,
-    doc,
-    getDoc,
-    setDoc
-  };
-
-  // Auth state observer — runs once Firebase is ready
-  onAuthStateChanged(auth, async (fbUser) => {
-    if (fbUser) {
-      if (!fbUser.emailVerified) {
-        // Defer to ensure DOM functions are ready
-        requestAnimationFrame(() => {
-          if (window._showVerificationPending) window._showVerificationPending(fbUser);
-        });
-        return;
-      }
-      // Load user data from Firestore
-      const userRef = doc(db, 'users', fbUser.uid);
-      const snap = await getDoc(userRef);
-      const displayName = snap.exists() ? snap.data().name : fbUser.email.split('@')[0];
-      window._launchAppWithUser({ uid: fbUser.uid, name: displayName, email: fbUser.email });
-    } else {
-      window._showAuthScreen();
-    }
-  });
-</script>
+<!-- Firebase v9 compat (CDN — no ES module imports needed) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-:root {
-  --bg: #f4f6f9;
-  --surface: #ffffff;
-  --surface2: #f0f3f8;
   --border: #e2e8f0;
   --text: #1a202c;
   --text2: #4a5568;
@@ -491,6 +428,7 @@ tr:hover td { background: var(--surface2); }
 
 /* SCIENTIFIC ITALIC */
 .sci-name { font-style: italic; font-size: 12px; color: var(--text3); }
+</style>
 
 /* ADDITIONAL STYLES */
 .auth-info { background: var(--accent-light); color: var(--accent); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 16px; display: none; }
@@ -545,68 +483,59 @@ tr:hover td { background: var(--surface2); }
   display: none;
 }
 .firebase-notice strong { display: block; margin-bottom: 4px; }
-
 </style>
-
 </head>
 <body>
 
 <!-- LOADING OVERLAY -->
 <div class="loading-overlay" id="loading-overlay" style="display:flex;">
-  <i class="fas fa-circle-notch loading-spinner"></i>
+  <div style="text-align:center;">
+    <i class="fas fa-circle-notch loading-spinner" style="font-size:32px;color:#3b5bdb;animation:spin 1s linear infinite;display:block;margin-bottom:12px;"></i>
+    <div style="font-size:13px;color:#64748b;">Loading MH Lab Inventory...</div>
+  </div>
 </div>
 
 <!-- AUTH SCREEN -->
-<div id="auth-screen" style="display:none;">
+<div id="auth-screen" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:linear-gradient(135deg,#1a237e 0%,#283593 40%,#3949ab 100%); padding:20px; flex-direction:column;">
   <div class="auth-card">
     <div class="auth-logo">
       <div class="lab-icon"><i class="fas fa-flask"></i></div>
       <h1>MH Lab Inventory</h1>
       <p>Stress Physiology &amp; Biostimulant Research</p>
     </div>
-
-    <!-- Firebase not configured notice -->
-    <div class="firebase-notice" id="firebase-notice">
-      <strong>⚙️ Firebase Setup Required</strong>
-      Open this file and replace the Firebase config placeholders with your project credentials.
-      See the README / setup guide below.
-    </div>
-
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="switchAuthTab('login')">Sign In</div>
       <div class="auth-tab" onclick="switchAuthTab('register')">Register</div>
     </div>
-    <div id="auth-error" class="auth-error"></div>
-    <div id="auth-success" class="auth-success"></div>
-
+    <div id="auth-error" class="auth-error" style="display:none;"></div>
+    <div id="auth-success" class="auth-success" style="display:none;"></div>
     <!-- Login -->
     <div id="login-form">
       <div class="form-group">
         <label>Email Address</label>
-        <input type="email" id="login-email" placeholder="lab@mhlab.com">
+        <input type="email" id="login-email" placeholder="lab@example.com" autocomplete="email">
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input type="password" id="login-pass" placeholder="••••••••">
+        <input type="password" id="login-pass" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">
       </div>
       <button class="btn-primary" id="login-btn" onclick="doLogin()">
         <i class="fas fa-sign-in-alt"></i> Sign In
       </button>
     </div>
-
     <!-- Register -->
-    <div id="register-form" style="display:none">
+    <div id="register-form" style="display:none;">
       <div class="form-group">
         <label>Full Name</label>
-        <input type="text" id="reg-name" placeholder="Your full name">
+        <input type="text" id="reg-name" placeholder="Your full name" autocomplete="name">
       </div>
       <div class="form-group">
         <label>Email Address</label>
-        <input type="email" id="reg-email" placeholder="you@example.com">
+        <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
       </div>
       <div class="form-group">
         <label>Password <span style="font-weight:400;color:var(--text3)">(min. 6 characters)</span></label>
-        <input type="password" id="reg-pass" placeholder="Min. 6 characters">
+        <input type="password" id="reg-pass" placeholder="Min. 6 characters" autocomplete="new-password">
       </div>
       <button class="btn-primary" id="register-btn" onclick="doRegister()">
         <i class="fas fa-user-plus"></i> Create Account
@@ -615,27 +544,28 @@ tr:hover td { background: var(--surface2); }
   </div>
 </div>
 
-<!-- EMAIL VERIFICATION PENDING SCREEN -->
-<div id="verification-screen">
+<!-- EMAIL VERIFICATION SCREEN -->
+<div id="verification-screen" style="display:none; min-height:100vh; align-items:center; justify-content:center; background:linear-gradient(135deg,#1a237e 0%,#283593 40%,#3949ab 100%); padding:20px;">
   <div class="verification-card">
     <div class="verify-icon"><i class="fas fa-envelope-open-text"></i></div>
     <h2>Check Your Email</h2>
     <p>A verification link was sent to<br>
        <span class="email-display" id="verify-email-display"></span><br><br>
-       Click the link in the email to activate your account. You may need to check your spam folder.
+       Click the link in the email, then come back and click Continue.
+       Check your spam folder if you don't see it.
     </p>
     <button class="btn-primary" style="margin-bottom:12px;" onclick="checkVerificationAndContinue()">
-      <i class="fas fa-refresh"></i> I've Verified — Continue
+      <i class="fas fa-check-circle"></i> I've Verified — Continue
     </button>
     <br>
     <button class="btn-text" onclick="resendVerification()">Resend verification email</button>
-    &nbsp;·&nbsp;
+    &nbsp;&middot;&nbsp;
     <button class="btn-text" onclick="doLogout()">Back to login</button>
   </div>
 </div>
 
 <!-- APP SCREEN -->
-<div id="app-screen" style="display:none; flex-direction:column;">
+<div id="app-screen" style="display:none; min-height:100vh; flex-direction:column;">
   <header>
     <div class="header-left">
       <div class="header-logo"><i class="fas fa-flask"></i></div>
@@ -649,7 +579,6 @@ tr:hover td { background: var(--surface2); }
       <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
   </header>
-
   <div class="tab-bar" id="tab-bar"></div>
   <main id="main-content"></main>
 </div>
@@ -678,7 +607,7 @@ tr:hover td { background: var(--surface2); }
     </div>
     <div class="modal-body">
       <div class="confirm-icon"><i class="fas fa-triangle-exclamation"></i></div>
-      <p style="text-align:center;color:var(--text2);" id="confirm-msg">Are you sure you want to delete this item? This action cannot be undone.</p>
+      <p style="text-align:center;color:var(--text2);" id="confirm-msg">Are you sure you want to delete this item?</p>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeConfirm()">Cancel</button>
@@ -688,12 +617,278 @@ tr:hover td { background: var(--surface2); }
 </div>
 
 <script>
-// ============================================================
-// MH LAB INVENTORY — Main App Logic
-// Data is saved to Firebase Firestore (cloud) per user
-// Falls back to localStorage if Firebase is not configured
-// ============================================================
+// ================================================================
+// FIREBASE INIT (compat CDN — works reliably on GitHub Pages)
+// ================================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyAVoFD-f-aXRdpUuOC7zv9KzBA19n__vlg",
+    authDomain: "mhlab-inventory.firebaseapp.com",
+    projectId: "mhlab-inventory",
+    storageBucket: "mhlab-inventory.firebasestorage.app",
+    messagingSenderId: "890657571551",
+    appId: "1:890657571551:web:fe2d98b875192b72831f6a"
+  };
 
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const fbDb   = firebase.firestore();
+
+// ================================================================
+// AUTH STATE — single source of truth
+// ================================================================
+let currentUser = null; // { uid, name, email }
+
+fbAuth.onAuthStateChanged(async function(fbUser) {
+  if (!fbUser) {
+    showScreen('auth');
+    return;
+  }
+  if (!fbUser.emailVerified) {
+    currentUser = null;
+    document.getElementById('verify-email-display').textContent = fbUser.email;
+    showScreen('verification');
+    return;
+  }
+  // Load name from Firestore
+  try {
+    const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+    const name = snap.exists ? snap.data().name : fbUser.email.split('@')[0];
+    currentUser = { uid: fbUser.uid, name, email: fbUser.email };
+  } catch(e) {
+    currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email };
+  }
+  document.getElementById('user-name-display').textContent = currentUser.name;
+  await loadDataThenRender();
+});
+
+// Safety: if auth hasn't resolved in 6 seconds, show login
+setTimeout(function() {
+  if (document.getElementById('loading-overlay').style.display !== 'none') {
+    showScreen('auth');
+  }
+}, 6000);
+
+// ================================================================
+// SCREEN MANAGEMENT
+// ================================================================
+function showScreen(which) {
+  document.getElementById('loading-overlay').style.display     = 'none';
+  document.getElementById('auth-screen').style.display         = which === 'auth'         ? 'flex' : 'none';
+  document.getElementById('verification-screen').style.display = which === 'verification' ? 'flex' : 'none';
+  document.getElementById('app-screen').style.display          = which === 'app'          ? 'flex' : 'none';
+}
+
+// ================================================================
+// AUTH FUNCTIONS
+// ================================================================
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && tab==='login') || (i===1 && tab==='register'));
+  });
+  document.getElementById('login-form').style.display    = tab==='login'    ? '' : 'none';
+  document.getElementById('register-form').style.display = tab==='register' ? '' : 'none';
+  clearAuthMessages();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('auth-success').style.display = 'none';
+}
+function showAuthSuccess(msg) {
+  const el = document.getElementById('auth-success');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('auth-error').style.display = 'none';
+}
+function clearAuthMessages() {
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+function setBtn(id, disabled, html) {
+  const b = document.getElementById(id);
+  b.disabled = disabled; b.innerHTML = html;
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  if (!email || !pass) return showAuthError('Please enter your email and password.');
+  setBtn('login-btn', true, '<i class="fas fa-circle-notch fa-spin"></i> Signing in...');
+  try {
+    await fbAuth.signInWithEmailAndPassword(email, pass);
+    // onAuthStateChanged handles the rest
+  } catch(e) {
+    setBtn('login-btn', false, '<i class="fas fa-sign-in-alt"></i> Sign In');
+    showAuthError(
+      e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
+        ? 'Incorrect email or password.'
+        : e.code === 'auth/too-many-requests'
+        ? 'Too many attempts. Please wait a few minutes.'
+        : e.code === 'auth/network-request-failed'
+        ? 'Network error. Check your internet connection.'
+        : 'Login failed: ' + e.message
+    );
+  }
+}
+
+async function doRegister() {
+  const name  = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass  = document.getElementById('reg-pass').value;
+  if (!name || !email || !pass) return showAuthError('All fields are required.');
+  if (pass.length < 6)          return showAuthError('Password must be at least 6 characters.');
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) return showAuthError('Please enter a valid email address.');
+  setBtn('register-btn', true, '<i class="fas fa-circle-notch fa-spin"></i> Creating account...');
+  try {
+    const cred = await fbAuth.createUserWithEmailAndPassword(email, pass);
+    await fbDb.collection('users').doc(cred.user.uid).set({ name, email });
+    await cred.user.sendEmailVerification();
+    // onAuthStateChanged fires -> shows verification screen
+  } catch(e) {
+    setBtn('register-btn', false, '<i class="fas fa-user-plus"></i> Create Account');
+    showAuthError(
+      e.code === 'auth/email-already-in-use' ? 'This email is already registered. Please sign in.'
+      : e.code === 'auth/weak-password'       ? 'Password is too weak. Use at least 6 characters.'
+      : e.code === 'auth/invalid-email'       ? 'Invalid email address.'
+      : e.code === 'auth/network-request-failed' ? 'Network error. Check your internet connection.'
+      : 'Registration failed: ' + e.message
+    );
+  }
+}
+
+async function checkVerificationAndContinue() {
+  try {
+    await fbAuth.currentUser.reload();
+    if (fbAuth.currentUser.emailVerified) {
+      // Trigger onAuthStateChanged by signing in again isn't needed —
+      // just manually proceed since we know user is verified now
+      const fbUser = fbAuth.currentUser;
+      try {
+        const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+        const name = snap.exists ? snap.data().name : fbUser.email.split('@')[0];
+        currentUser = { uid: fbUser.uid, name, email: fbUser.email };
+      } catch(e) {
+        currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email };
+      }
+      document.getElementById('user-name-display').textContent = currentUser.name;
+      await loadDataThenRender();
+    } else {
+      alert('Email not verified yet.\nPlease click the link in your email first, then try again.');
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function resendVerification() {
+  try {
+    if (fbAuth.currentUser) {
+      await fbAuth.currentUser.sendEmailVerification();
+      alert('Verification email resent!\nCheck your inbox and spam folder.');
+    }
+  } catch(e) {
+    alert('Could not resend: ' + e.message);
+  }
+}
+
+async function doLogout() {
+  currentUser = null;
+  await fbAuth.signOut();
+  showScreen('auth');
+  clearAuthMessages();
+}
+
+// ================================================================
+// DATA LAYER — Firestore + localStorage cache
+// ================================================================
+let _data = null;
+
+async function loadDataThenRender() {
+  showScreen('loading');
+  document.getElementById('loading-overlay').style.display = 'flex';
+  try {
+    const snap = await fbDb.collection('labdata').doc(currentUser.uid).get();
+    if (snap.exists) {
+      _data = snap.data().inventory;
+    } else {
+      _data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+      await _saveRemote(_data);
+    }
+  } catch(e) {
+    console.warn('Firestore load failed, using localStorage:', e.message);
+    const cached = localStorage.getItem('mhlab_data_' + currentUser.uid);
+    _data = cached ? JSON.parse(cached) : JSON.parse(JSON.stringify(DEFAULT_DATA));
+  }
+  showScreen('app');
+  buildTabBar();
+  renderTab(currentTab);
+}
+
+async function _saveRemote(data) {
+  try {
+    await fbDb.collection('labdata').doc(currentUser.uid).set({ inventory: data });
+  } catch(e) {
+    console.warn('Firestore save failed:', e.message);
+  }
+}
+
+function getData() {
+  if (!_data) _data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  return _data;
+}
+
+function saveData(data) {
+  _data = data;
+  if (currentUser) localStorage.setItem('mhlab_data_' + currentUser.uid, JSON.stringify(data));
+  _saveRemote(data); // async, non-blocking
+}
+
+function resetData() {
+  if (!confirm('Reset ALL data to defaults? This cannot be undone.')) return;
+  saveData(JSON.parse(JSON.stringify(DEFAULT_DATA)));
+  renderTab(currentTab);
+}
+
+function getNextId(arr) {
+  return arr.length ? Math.max(...arr.map(i => i.id || 0)) + 1 : 1;
+}
+
+// ================================================================
+// EXPIRY / BADGE HELPERS
+// ================================================================
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function expiryStatus(d) {
+  if (!d) return 'unknown';
+  const e = new Date(d), n = new Date(), diff = (e-n)/(86400000);
+  if (isNaN(e)) return 'unknown';
+  if (diff < 0) return 'expired';
+  if (diff <= 30) return 'expiring_soon';
+  return 'valid';
+}
+function expiryBadge(d) {
+  const s = expiryStatus(d);
+  if (s==='expired')       return '<span class="badge badge-red"><i class="fas fa-circle-xmark"></i> Expired</span>';
+  if (s==='expiring_soon') return '<span class="badge badge-yellow"><i class="fas fa-triangle-exclamation"></i> Expiring</span>';
+  if (s==='valid')         return '<span class="badge badge-green"><i class="fas fa-circle-check"></i> Valid</span>';
+  return '<span class="badge badge-gray">—</span>';
+}
+function conditionBadge(c) {
+  if (!c) return '<span class="badge badge-gray">—</span>';
+  const m={Good:'badge-green',New:'badge-blue',Bad:'badge-red',Problem:'badge-red','Need to check':'badge-yellow'};
+  return `<span class="badge ${m[c]||'badge-gray'}">${escHtml(c)}</span>`;
+}
+function locationBadge(l) {
+  if (!l) return '';
+  const m={'Almira':'loc-almira','Refrigerator (Normal)':'loc-ref-n','Refrigerator (-20°C)':'loc-ref-20','Cupboard (Lab)':'loc-cupboard'};
+  return `<span class="badge ${m[l]||''}">${escHtml(l)}</span>`;
+}
+
+// ================================================================
+// APP DATA + LOGIC (extracted from original file)
+// ================================================================
 const DEFAULT_DATA = {
   chemicals: [
     // ALMIRA
@@ -1086,9 +1281,8 @@ let _currentFirebaseUser = null;
 
 function _isFirebaseConfigured() {
   try {
-    if (!window._firebaseAuth) return false;
-    const key = window._firebaseAuth.app.options.apiKey || '';
-    return key.length > 10 && key !== 'YOUR_API_KEY';
+    return window._firebaseAuth && 
+           window._firebaseAuth.app.options.apiKey !== 'YOUR_API_KEY';
   } catch(e) { return false; }
 }
 
@@ -1101,6 +1295,9 @@ window._showAuthScreen = function() {
   document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('verification-screen').style.display = 'none';
+  if (!_isFirebaseConfigured()) {
+    document.getElementById('firebase-notice').style.display = 'block';
+  }
 };
 
 window._showVerificationPending = function(fbUser) {
@@ -1258,15 +1455,14 @@ async function doLogin() {
   }
 
   try {
-    await window._firebaseFns.signInWithEmailAndPassword(window._firebaseAuth, email, pass);
-    // onAuthStateChanged will handle the rest — shows app or verification screen
+    const cred = await window._firebaseFns.signInWithEmailAndPassword(window._firebaseAuth, email, pass);
+    // onAuthStateChanged will handle the rest
   } catch(e) {
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-    const msg = e.code === 'auth/invalid-credential' ? 'Incorrect email or password.' :
-                e.code === 'auth/user-not-found' ? 'No account found with that email.' :
+    const msg = e.code === 'auth/invalid-credential' ? 'Invalid email or password.' :
+                e.code === 'auth/user-not-found' ? 'No account with that email.' :
                 e.code === 'auth/wrong-password' ? 'Incorrect password.' :
-                e.code === 'auth/too-many-requests' ? 'Too many attempts. Please wait and try again.' :
-                e.code === 'auth/network-request-failed' ? 'Network error. Check your internet connection.' :
+                e.code === 'auth/too-many-requests' ? 'Too many attempts. Try again later.' :
                 'Login failed: ' + e.message;
     showAuthError(msg);
   }
@@ -1919,26 +2115,15 @@ function renderAnalytics() {
   });
 }
 
-// ===== INIT =====
+// ================================================================
+// INIT
+// ================================================================
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeConfirm(); }
 });
-
 document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-document.getElementById('reg-pass').addEventListener('keydown', e => { if(e.key==='Enter') doRegister(); });
-
-// Safety net: if Firebase auth hasn't responded in 5s, show auth screen
-setTimeout(() => {
-  const loader = document.getElementById('loading-overlay');
-  if (loader && loader.style.display !== 'none') {
-    showLoading(false);
-    document.getElementById('auth-screen').style.display = 'flex';
-    if (!_isFirebaseConfigured()) {
-      document.getElementById('firebase-notice').style.display = 'block';
-    }
-  }
-}, 5000);
+document.getElementById('login-pass').addEventListener('keydown',  e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('reg-pass').addEventListener('keydown',    e => { if(e.key==='Enter') doRegister(); });
 
 </script>
 </body>
