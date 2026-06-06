@@ -567,7 +567,7 @@ tr:hover td { background: linear-gradient(135deg, #f8faff, #f5f3ff); }
       </div>
     </div>
     <div class="header-right">
-      <div class="user-badge"><i class="fas fa-circle-user"></i> <span id="user-name-display">Admin</span></div>
+      <div class="user-badge"><i class="fas fa-circle-user"></i> <span id="user-name-display">Admin</span> <span id="role-badge-display"></span></div>
       <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
   </header>
@@ -630,7 +630,24 @@ const fbDb   = firebase.firestore();
 // ================================================================
 let currentUser = null; // { uid, name, email }
 
+// ── ADMIN LOCAL LOGIN (no Firebase Auth) ─────────────────────────────────
+const ADMIN_UID  = 'MHLAB_ADMIN_49706929';
+const ADMIN_PASS = 'mn6UI6UJ83oXvaxh';
+
+function tryAdminLogin(uid, pass) {
+  return uid.trim() === ADMIN_UID && pass === ADMIN_PASS;
+}
+
 fbAuth.onAuthStateChanged(async function(fbUser) {
+  // Check if admin is already logged in via sessionStorage
+  const adminSession = sessionStorage.getItem('mhlab_admin');
+  if (adminSession) {
+    currentUser = JSON.parse(adminSession);
+    document.getElementById('user-name-display').textContent = currentUser.name;
+    await loadDataThenRender();
+    return;
+  }
+
   if (!fbUser) {
     showScreen('auth');
     return;
@@ -641,13 +658,23 @@ fbAuth.onAuthStateChanged(async function(fbUser) {
     showScreen('verification');
     return;
   }
-  // Load name from Firestore
+  // Load user profile + role from Firestore
   try {
     const snap = await fbDb.collection('users').doc(fbUser.uid).get();
-    const name = snap.exists ? snap.data().name : fbUser.email.split('@')[0];
-    currentUser = { uid: fbUser.uid, name, email: fbUser.email };
+    const data = snap.exists ? snap.data() : {};
+    const name = data.name || fbUser.email.split('@')[0];
+    const role = data.blocked ? 'blocked' : (data.role || 'viewer');
+    if (role === 'blocked') {
+      await fbAuth.signOut();
+      showScreen('auth');
+      showAuthError('Your account has been blocked. Contact the administrator.');
+      return;
+    }
+    currentUser = { uid: fbUser.uid, name, email: fbUser.email, role };
+    // Record login time
+    fbDb.collection('users').doc(fbUser.uid).update({ lastLogin: new Date().toISOString() }).catch(()=>{});
   } catch(e) {
-    currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email };
+    currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email, role: 'viewer' };
   }
   document.getElementById('user-name-display').textContent = currentUser.name;
   await loadDataThenRender();
@@ -703,12 +730,22 @@ function setBtn(id, disabled, html) {
 }
 
 async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pass  = document.getElementById('login-pass').value;
-  if (!email || !pass) return showAuthError('Please enter your email and password.');
+  const emailOrId = document.getElementById('login-email').value.trim();
+  const pass      = document.getElementById('login-pass').value;
+  if (!emailOrId || !pass) return showAuthError('Please enter your credentials.');
   setBtn('login-btn', true, '<i class="fas fa-circle-notch fa-spin"></i> Signing in...');
+
+  // Admin local login
+  if (tryAdminLogin(emailOrId, pass)) {
+    currentUser = { uid: ADMIN_UID, name: 'Admin', email: 'admin@mhlab.local', role: 'admin' };
+    sessionStorage.setItem('mhlab_admin', JSON.stringify(currentUser));
+    document.getElementById('user-name-display').textContent = 'Admin';
+    await loadDataThenRender();
+    return;
+  }
+
   try {
-    await fbAuth.signInWithEmailAndPassword(email, pass);
+    await fbAuth.signInWithEmailAndPassword(emailOrId, pass);
     // onAuthStateChanged handles the rest
   } catch(e) {
     setBtn('login-btn', false, '<i class="fas fa-sign-in-alt"></i> Sign In');
@@ -758,8 +795,10 @@ async function checkVerificationAndContinue() {
       const fbUser = fbAuth.currentUser;
       try {
         const snap = await fbDb.collection('users').doc(fbUser.uid).get();
-        const name = snap.exists ? snap.data().name : fbUser.email.split('@')[0];
-        currentUser = { uid: fbUser.uid, name, email: fbUser.email };
+        const data = snap.exists ? snap.data() : {};
+        const name = data.name || fbUser.email.split('@')[0];
+        const role = data.blocked ? 'viewer' : (data.role || 'viewer');
+        currentUser = { uid: fbUser.uid, name, email: fbUser.email, role };
       } catch(e) {
         currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email };
       }
@@ -786,7 +825,8 @@ async function resendVerification() {
 
 async function doLogout() {
   currentUser = null;
-  await fbAuth.signOut();
+  sessionStorage.removeItem('mhlab_admin');
+  try { await fbAuth.signOut(); } catch(e) {}
   showScreen('auth');
   clearAuthMessages();
 }
@@ -800,7 +840,7 @@ async function loadDataThenRender() {
   showScreen('loading');
   document.getElementById('loading-overlay').style.display = 'flex';
   try {
-    const snap = await fbDb.collection('labdata').doc(currentUser.uid).get();
+    const snap = await fbDb.collection('labdata').doc('shared').get();
     if (snap.exists) {
       _data = snap.data().inventory;
     } else {
@@ -809,17 +849,24 @@ async function loadDataThenRender() {
     }
   } catch(e) {
     console.warn('Firestore load failed, using localStorage:', e.message);
-    const cached = localStorage.getItem('mhlab_data_' + currentUser.uid);
+    const cached = localStorage.getItem('mhlab_data_shared');
     _data = cached ? JSON.parse(cached) : JSON.parse(JSON.stringify(DEFAULT_DATA));
   }
   showScreen('app');
+  // Set role badge in header
+  const rb = document.getElementById('role-badge-display');
+  if (rb && currentUser) {
+    const roleColors = { admin:'#ef4444', editor:'#f59e0b', viewer:'#6b7280' };
+    const roleLabels = { admin:'Admin', editor:'Editor', viewer:'Viewer' };
+    rb.innerHTML = `<span style="background:${roleColors[currentUser.role]||'#6b7280'};color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:4px;">${roleLabels[currentUser.role]||'Viewer'}</span>`;
+  }
   buildTabBar();
   renderTab(currentTab);
 }
 
 async function _saveRemote(data) {
   try {
-    await fbDb.collection('labdata').doc(currentUser.uid).set({ inventory: data });
+    await fbDb.collection('labdata').doc('shared').set({ inventory: data });
   } catch(e) {
     console.warn('Firestore save failed:', e.message);
   }
@@ -832,7 +879,7 @@ function getData() {
 
 function saveData(data) {
   _data = data;
-  if (currentUser) localStorage.setItem('mhlab_data_' + currentUser.uid, JSON.stringify(data));
+  if (currentUser) localStorage.setItem('mhlab_data_shared', JSON.stringify(data));
   _saveRemote(data); // async, non-blocking
 }
 
@@ -1301,7 +1348,8 @@ const TABS = [
   {key:'glassware', label:'Glassware', icon:'fa-wine-bottle',color:'#7c3aed'},
   {key:'books',     label:'Books',     icon:'fa-book',       color:'#d97706'},
   {key:'students',  label:'Students',  icon:'fa-users',      color:'#db2777'},
-  {key:'analytics', label:'Analytics', icon:'fa-chart-bar',  color:'#ea580c'}
+  {key:'analytics', label:'Analytics', icon:'fa-chart-bar',  color:'#ea580c'},
+  {key:'admin',     label:'Admin',     icon:'fa-shield-halved', color:'#dc2626'}
 ];
 
 function buildTabBar() {
@@ -1315,7 +1363,7 @@ function buildTabBar() {
     students: data.students.length
   };
   const bar = document.getElementById('tab-bar');
-  bar.innerHTML = TABS.map(t => `
+  bar.innerHTML = TABS.filter(t => t.key !== 'admin' || (currentUser && currentUser.role === 'admin')).map(t => `
     <button class="tab-btn${t.key===currentTab?' active':''}" onclick="switchTab('${t.key}')"
       style="${t.key===currentTab ? `color:${t.color};border-bottom-color:${t.color};` : ''}">
       <i class="fas ${t.icon}" style="color:${t.color};opacity:${t.key===currentTab?'1':'0.6'};"></i>
@@ -1343,6 +1391,7 @@ function launchApp(user) {
 function renderTab(key) {
   const main = document.getElementById('main-content');
   if (key === 'analytics') { renderAnalytics(); return; }
+  if (key === 'admin') { renderAdminPanel(); return; }
   
   const data = getData();
   let items = [...(data[key] || [])];
@@ -1398,8 +1447,12 @@ function renderTab(key) {
         <input class="search-input" type="text" placeholder="Search ${key}..." value="${escHtml(searchQuery)}" oninput="doSearch(this.value)">
       </div>
       ${filterOptions ? `<select class="filter-select" onchange="doFilter(this.value)">${filterOptions}</select>` : ''}
-      <button class="btn-add" onclick="openAddModal('${key}')"><i class="fas fa-plus"></i> Add ${getTabLabel(key)}</button>
-      <button class="btn-reset" onclick="resetData()" title="Reset to default data"><i class="fas fa-rotate-left"></i> Reset</button>
+      ${(currentUser && (currentUser.role==='admin'||currentUser.role==='editor')) ? `
+        <button class="btn-add" onclick="openAddModal('${key}')"><i class="fas fa-plus"></i> Add ${getTabLabel(key)}</button>
+      ` : ''}
+      ${(currentUser && currentUser.role==='admin') ? `
+        <button class="btn-reset" onclick="resetData()" title="Reset to default data"><i class="fas fa-rotate-left"></i> Reset</button>
+      ` : ''}
     </div>
     <div class="table-wrap">
       <div class="table-info">Showing ${paged.length} of ${total} ${key}</div>
@@ -1509,10 +1562,10 @@ function renderRow(key, item) {
   }
   return `<tr>
     ${cells}
-    <td><div class="actions">
+    ${(currentUser&&(currentUser.role==='admin'||currentUser.role==='editor')) ? `<td><div class="actions">
       <button class="btn-icon edit" onclick="openEditModal('${key}',${item.id})" title="Edit"><i class="fas fa-pen"></i></button>
-      <button class="btn-icon delete" onclick="openDelete('${key}',${item.id})" title="Delete"><i class="fas fa-trash"></i></button>
-    </div></td>
+      ${currentUser.role==='admin'?`<button class="btn-icon delete" onclick="openDelete('${key}',${item.id})" title="Delete"><i class="fas fa-trash"></i></button>`:''}
+    </div></td>` : '<td style="width:60px;"></td>'}
   </tr>`;
 }
 
@@ -1750,6 +1803,161 @@ function renderAnalytics() {
     data:{labels:Object.keys(eqCond),datasets:[{label:'Count',data:Object.values(eqCond),backgroundColor:['#0ca678','#3b5bdb','#e03131','#e67700','#94a3b8'],borderRadius:6}]},
     options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}
   });
+}
+
+
+// ================================================================
+// ADMIN PANEL
+// ================================================================
+async function renderAdminPanel() {
+  if (!currentUser || currentUser.role !== 'admin') {
+    document.getElementById('main-content').innerHTML = `
+      <div class="empty-state"><i class="fas fa-lock"></i><p>Access denied.</p></div>`;
+    return;
+  }
+  const mc = document.getElementById('main-content');
+  mc.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+    <i class="fas fa-circle-notch fa-spin" style="color:var(--accent);font-size:20px;"></i>
+    <span style="color:var(--text2);">Loading users...</span></div>`;
+
+  try {
+    const snap = await fbDb.collection('users').get();
+    const users = [];
+    snap.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
+    users.sort((a,b) => (b.lastLogin||'').localeCompare(a.lastLogin||''));
+    renderAdminUI(users);
+  } catch(e) {
+    mc.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>
+      <p>Failed to load users: ${e.message}</p></div>`;
+  }
+}
+
+function renderAdminUI(users) {
+  const mc = document.getElementById('main-content');
+  const totalUsers   = users.length;
+  const editorCount  = users.filter(u => u.role === 'editor').length;
+  const blockedCount = users.filter(u => u.blocked).length;
+
+  const rows = users.map(u => {
+    const role    = u.blocked ? 'blocked' : (u.role || 'viewer');
+    const roleClr = {admin:'#ef4444', editor:'#f59e0b', viewer:'#6b7280', blocked:'#374151'}[role] || '#6b7280';
+    const roleLbl = {admin:'Admin', editor:'Editor', viewer:'Viewer', blocked:'Blocked'}[role] || 'Viewer';
+    const lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never';
+    return `<tr>
+      <td>
+        <div style="font-weight:600;font-size:13px;">${escHtml(u.name||'—')}</div>
+        <div style="font-size:11px;color:var(--text3);">${escHtml(u.email||'—')}</div>
+      </td>
+      <td>
+        <span style="background:${roleClr};color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">${roleLbl}</span>
+      </td>
+      <td style="font-size:12px;color:var(--text3);">${lastLogin}</td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${role !== 'editor' && !u.blocked ? `<button onclick="setUserRole('${u.id}','editor')" style="padding:5px 10px;background:#fef3c7;color:#92400e;border:1.5px solid #fde68a;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">Make Editor</button>` : ''}
+          ${role === 'editor' ? `<button onclick="setUserRole('${u.id}','viewer')" style="padding:5px 10px;background:#e0f2fe;color:#0369a1;border:1.5px solid #bae6fd;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">Make Viewer</button>` : ''}
+          ${!u.blocked ? `<button onclick="toggleBlock('${u.id}',true)" style="padding:5px 10px;background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;"><i class="fas fa-ban"></i> Block</button>` : `<button onclick="toggleBlock('${u.id}',false)" style="padding:5px 10px;background:#d1fae5;color:#065f46;border:1.5px solid #6ee7b7;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;"><i class="fas fa-check"></i> Unblock</button>`}
+          <button onclick="removeUser('${u.id}','${escHtml(u.email||'')}')" style="padding:5px 10px;background:#f1f5f9;color:#dc2626;border:1.5px solid #fca5a5;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  mc.innerHTML = `
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px;">
+      <div class="stat-card" style="border-left:4px solid #4f46e5;">
+        <div class="stat-icon" style="background:#ede9fe;color:#4f46e5;"><i class="fas fa-users"></i></div>
+        <div class="stat-num" style="color:#4f46e5;">${totalUsers}</div>
+        <div class="stat-label">Total Users</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #f59e0b;">
+        <div class="stat-icon" style="background:#fef3c7;color:#d97706;"><i class="fas fa-pen"></i></div>
+        <div class="stat-num" style="color:#d97706;">${editorCount}</div>
+        <div class="stat-label">Editors</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #dc2626;">
+        <div class="stat-icon" style="background:#fee2e2;color:#dc2626;"><i class="fas fa-ban"></i></div>
+        <div class="stat-num" style="color:#dc2626;">${blockedCount}</div>
+        <div class="stat-label">Blocked</div>
+      </div>
+      <div class="stat-card" style="border-left:4px solid #059669;">
+        <div class="stat-icon" style="background:#d1fae5;color:#059669;"><i class="fas fa-shield-halved"></i></div>
+        <div class="stat-num" style="color:#059669;">${totalUsers - editorCount - blockedCount}</div>
+        <div class="stat-label">Viewers</div>
+      </div>
+    </div>
+
+    <!-- Admin credentials reminder -->
+    <div style="background:linear-gradient(135deg,#1e1b4b,#4338ca);border-radius:12px;padding:18px 22px;margin-bottom:20px;color:white;display:flex;align-items:center;gap:16px;">
+      <i class="fas fa-key" style="font-size:24px;opacity:0.8;"></i>
+      <div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px;">Your Admin Credentials</div>
+        <div style="font-size:12px;opacity:0.8;">User ID: <code style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;">MHLAB_ADMIN_49706929</code>
+        &nbsp; Password: <code style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;">mn6UI6UJ83oXvaxh</code></div>
+      </div>
+    </div>
+
+    <!-- Permission guide -->
+    <div style="background:white;border-radius:12px;padding:18px 22px;margin-bottom:20px;border:1.5px solid var(--border);display:flex;gap:24px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+        <span style="background:#ef4444;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Admin</span>
+        <span style="color:var(--text2);">Full access — view, add, edit, delete, manage users</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+        <span style="background:#f59e0b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Editor</span>
+        <span style="color:var(--text2);">Can view, add and edit — cannot delete or manage users</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+        <span style="background:#6b7280;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Viewer</span>
+        <span style="color:var(--text2);">Read-only — can browse inventory but cannot make changes</span>
+      </div>
+    </div>
+
+    <!-- Users table -->
+    <div class="table-wrap">
+      <div class="table-info" style="display:flex;align-items:center;justify-content:space-between;">
+        <span><i class="fas fa-users" style="color:var(--accent);margin-right:6px;"></i> <strong>${totalUsers}</strong> registered users</span>
+        <button onclick="renderAdminPanel()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;">
+          <i class="fas fa-refresh"></i> Refresh
+        </button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody>${rows || '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text3);">No users registered yet</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function setUserRole(uid, role) {
+  try {
+    await fbDb.collection('users').doc(uid).update({ role, blocked: false });
+    await renderAdminPanel();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function toggleBlock(uid, block) {
+  const action = block ? 'block' : 'unblock';
+  if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+  try {
+    await fbDb.collection('users').doc(uid).update({ blocked: block });
+    await renderAdminPanel();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function removeUser(uid, email) {
+  if (!confirm(`Permanently remove ${email} from the user list?\nNote: They can still log in unless you also block them first.`)) return;
+  try {
+    await fbDb.collection('users').doc(uid).delete();
+    await renderAdminPanel();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 // ================================================================
