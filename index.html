@@ -25,21 +25,14 @@
   // Get it from: https://console.firebase.google.com
   // Project Settings > Your Apps > Web App > Config
   // ============================================================
- const firebaseConfig = {
-
-  apiKey: "AIzaSyAVoFD-f-aXRdpUuOC7zv9KzBA19n__vlg",
-
-  authDomain: "mhlab-inventory.firebaseapp.com",
-
-  projectId: "mhlab-inventory",
-
-  storageBucket: "mhlab-inventory.firebasestorage.app",
-
-  messagingSenderId: "890657571551",
-
-  appId: "1:890657571551:web:fe2d98b875192b72831f6a"
-
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyAVoFD-f-aXRdpUuOC7zv9KzBA19n__vlg",
+    authDomain: "mhlab-inventory.firebaseapp.com",
+    projectId: "mhlab-inventory",
+    storageBucket: "mhlab-inventory.firebasestorage.app",
+    messagingSenderId: "890657571551",
+    appId: "1:890657571551:web:fe2d98b875192b72831f6a"
+  };
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -559,7 +552,7 @@ tr:hover td { background: var(--surface2); }
 <body>
 
 <!-- LOADING OVERLAY -->
-<div class="loading-overlay" id="loading-overlay">
+<div class="loading-overlay" id="loading-overlay" style="display:flex;">
   <i class="fas fa-circle-notch loading-spinner"></i>
 </div>
 
@@ -1108,9 +1101,6 @@ window._showAuthScreen = function() {
   document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('verification-screen').style.display = 'none';
-  if (!_isFirebaseConfigured()) {
-    document.getElementById('firebase-notice').style.display = 'block';
-  }
 };
 
 window._showVerificationPending = function(fbUser) {
@@ -1268,14 +1258,15 @@ async function doLogin() {
   }
 
   try {
-    const cred = await window._firebaseFns.signInWithEmailAndPassword(window._firebaseAuth, email, pass);
-    // onAuthStateChanged will handle the rest
+    await window._firebaseFns.signInWithEmailAndPassword(window._firebaseAuth, email, pass);
+    // onAuthStateChanged will handle the rest — shows app or verification screen
   } catch(e) {
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-    const msg = e.code === 'auth/invalid-credential' ? 'Invalid email or password.' :
-                e.code === 'auth/user-not-found' ? 'No account with that email.' :
+    const msg = e.code === 'auth/invalid-credential' ? 'Incorrect email or password.' :
+                e.code === 'auth/user-not-found' ? 'No account found with that email.' :
                 e.code === 'auth/wrong-password' ? 'Incorrect password.' :
-                e.code === 'auth/too-many-requests' ? 'Too many attempts. Try again later.' :
+                e.code === 'auth/too-many-requests' ? 'Too many attempts. Please wait and try again.' :
+                e.code === 'auth/network-request-failed' ? 'Network error. Check your internet connection.' :
                 'Login failed: ' + e.message;
     showAuthError(msg);
   }
@@ -1933,23 +1924,21 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeConfirm(); }
 });
 
+document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 document.getElementById('reg-pass').addEventListener('keydown', e => { if(e.key==='Enter') doRegister(); });
 
-// Firebase onAuthStateChanged handles initial login check.
-// If Firebase is not configured, show auth screen quickly.
-// If it IS configured, onAuthStateChanged will hide the loader.
-// Safety net: hide loader after 4s no matter what.
+// Safety net: if Firebase auth hasn't responded in 5s, show auth screen
 setTimeout(() => {
   const loader = document.getElementById('loading-overlay');
   if (loader && loader.style.display !== 'none') {
     showLoading(false);
+    document.getElementById('auth-screen').style.display = 'flex';
     if (!_isFirebaseConfigured()) {
-      document.getElementById('auth-screen').style.display = 'flex';
       document.getElementById('firebase-notice').style.display = 'block';
     }
   }
-}, 4000);
+}, 5000);
 
 </script>
 </body>
