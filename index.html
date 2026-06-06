@@ -696,13 +696,18 @@ fbAuth.onAuthStateChanged(async function(fbUser) {
       return;
     }
     // Always upsert user doc so old accounts appear in admin panel
-    await ref.set({
+    const userEntry = {
       name,
       email: fbUser.email,
       role: data.role || 'viewer',
       blocked: data.blocked || false,
       lastLogin: new Date().toISOString()
-    }, { merge: true });
+    };
+    await ref.set(userEntry, { merge: true });
+    // Also write to shared registry (single doc readable by all logged-in users)
+    await fbDb.collection('meta').doc('users').set(
+      { [fbUser.uid]: userEntry }, { merge: true }
+    );
     currentUser = { uid: fbUser.uid, name, email: fbUser.email, role };
   } catch(e) {
     currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email, role: 'viewer' };
@@ -1893,15 +1898,16 @@ async function renderAdminPanel() {
   // Unsubscribe any previous listener
   if (_adminUnsubscribe) { _adminUnsubscribe(); _adminUnsubscribe = null; }
 
-  // Real-time listener — admin panel updates the moment a new user signs in
-  _adminUnsubscribe = fbDb.collection('users').onSnapshot(snap => {
-    const users = [];
-    snap.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
+  // Real-time listener on single registry doc (no list permission needed)
+  _adminUnsubscribe = fbDb.collection('meta').doc('users').onSnapshot(snap => {
+    const registry = snap.exists ? snap.data() : {};
+    const users = Object.entries(registry).map(([uid, data]) => ({ id: uid, ...data }));
     users.sort((a,b) => (b.lastLogin||'').localeCompare(a.lastLogin||''));
     renderAdminUI(users);
   }, err => {
     mc.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>
-      <p>Failed to load users: ${err.message}</p></div>`;
+      <p>Failed to load users.<br><small style="color:#999;">${err.message}</small><br><br>
+      <b>Fix:</b> Go to Firebase Console → Firestore → Rules and set test mode (allow read, write)</p></div>`;
   });
 }
 
@@ -2011,8 +2017,11 @@ function renderAdminUI(users) {
 
 async function setUserRole(uid, role) {
   try {
-    await fbDb.collection('users').doc(uid).update({ role, blocked: false });
-    await renderAdminPanel();
+    await fbDb.collection('users').doc(uid).set({ role, blocked: false }, { merge: true });
+    await fbDb.collection('meta').doc('users').set(
+      { [uid]: { role, blocked: false } }, { merge: true }
+    );
+    // onSnapshot will auto-refresh the UI
   } catch(e) { alert('Error: ' + e.message); }
 }
 
@@ -2020,16 +2029,23 @@ async function toggleBlock(uid, block) {
   const action = block ? 'block' : 'unblock';
   if (!confirm(`Are you sure you want to ${action} this user?`)) return;
   try {
-    await fbDb.collection('users').doc(uid).update({ blocked: block });
-    await renderAdminPanel();
+    await fbDb.collection('users').doc(uid).set({ blocked: block }, { merge: true });
+    await fbDb.collection('meta').doc('users').set(
+      { [uid]: { blocked: block } }, { merge: true }
+    );
+    // onSnapshot will auto-refresh the UI
   } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function removeUser(uid, email) {
-  if (!confirm(`Permanently remove ${email} from the user list?\nNote: They can still log in unless you also block them first.`)) return;
+  if (!confirm(`Remove ${email} from the user list?\nThey will be re-added if they log in again.`)) return;
   try {
-    await fbDb.collection('users').doc(uid).delete();
-    await renderAdminPanel();
+    // Remove from registry doc using FieldValue.delete()
+    const update = {};
+    update[uid] = firebase.firestore.FieldValue.delete();
+    await fbDb.collection('meta').doc('users').update(update);
+    await fbDb.collection('users').doc(uid).delete().catch(()=>{});
+    // onSnapshot will auto-refresh the UI
   } catch(e) { alert('Error: ' + e.message); }
 }
 
