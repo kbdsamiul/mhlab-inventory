@@ -1269,45 +1269,10 @@ const DEFAULT_DATA = {
 // ===== FIREBASE HELPERS =====
 let _currentFirebaseUser = null;
 
-function _isFirebaseConfigured() {
-  try {
-    return window._firebaseAuth && 
-           window._firebaseAuth.app.options.apiKey !== 'YOUR_API_KEY';
-  } catch(e) { return false; }
-}
 
-function showLoading(show) {
-  document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
-}
 
-window._showAuthScreen = function() {
-  showLoading(false);
-  document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('app-screen').style.display = 'none';
-  document.getElementById('verification-screen').style.display = 'none';
-  if (!_isFirebaseConfigured()) {
-    document.getElementById('firebase-notice').style.display = 'block';
-  }
-};
 
-window._showVerificationPending = function(fbUser) {
-  showLoading(false);
-  _currentFirebaseUser = fbUser;
-  document.getElementById('verify-email-display').textContent = fbUser.email;
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'none';
-  document.getElementById('verification-screen').style.display = 'flex';
-};
 
-window._launchAppWithUser = function(user) {
-  showLoading(false);
-  _currentFirebaseUser = user;
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('verification-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'flex';
-  document.getElementById('user-name-display').textContent = user.name;
-  loadDataThenRender();
-};
 
 // ===== AUTH FUNCTIONS =====
 
