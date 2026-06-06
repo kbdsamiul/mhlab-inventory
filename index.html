@@ -571,6 +571,27 @@ tr:hover td { background: linear-gradient(135deg, #f8faff, #f5f3ff); }
       <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
   </header>
+  <!-- Unsaved changes banner -->
+  <div id="unsaved-bar" style="display:none;background:linear-gradient(135deg,#92400e,#d97706);
+    color:white;padding:10px 24px;display:none;align-items:center;justify-content:space-between;gap:12px;">
+    <span style="font-size:13px;font-weight:600;">
+      <i class="fas fa-circle-exclamation" style="margin-right:6px;"></i>
+      You have unsaved changes
+    </span>
+    <div style="display:flex;gap:10px;">
+      <button onclick="discardChanges()" style="padding:6px 14px;background:rgba(255,255,255,0.2);
+        color:white;border:1.5px solid rgba(255,255,255,0.4);border-radius:6px;
+        font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);">
+        <i class="fas fa-rotate-left"></i> Discard
+      </button>
+      <button onclick="saveAllChanges()" id="save-all-btn" style="padding:6px 18px;
+        background:white;color:#92400e;border:none;border-radius:6px;
+        font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);
+        box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+        <i class="fas fa-cloud-upload-alt"></i> Save for Everyone
+      </button>
+    </div>
+  </div>
   <div class="tab-bar" id="tab-bar"></div>
   <main id="main-content"></main>
 </div>
@@ -625,6 +646,9 @@ firebase.initializeApp(firebaseConfig);
 const fbAuth = firebase.auth();
 const fbDb   = firebase.firestore();
 
+// Set session-only persistence — user must log in each time they open the app
+fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e => console.warn('Persistence:', e));
+
 // ================================================================
 // AUTH STATE — single source of truth
 // ================================================================
@@ -660,9 +684,10 @@ fbAuth.onAuthStateChanged(async function(fbUser) {
   }
   // Load user profile + role from Firestore
   try {
-    const snap = await fbDb.collection('users').doc(fbUser.uid).get();
+    const ref  = fbDb.collection('users').doc(fbUser.uid);
+    const snap = await ref.get();
     const data = snap.exists ? snap.data() : {};
-    const name = data.name || fbUser.email.split('@')[0];
+    const name = data.name || fbUser.displayName || fbUser.email.split('@')[0];
     const role = data.blocked ? 'blocked' : (data.role || 'viewer');
     if (role === 'blocked') {
       await fbAuth.signOut();
@@ -670,9 +695,15 @@ fbAuth.onAuthStateChanged(async function(fbUser) {
       showAuthError('Your account has been blocked. Contact the administrator.');
       return;
     }
+    // Always upsert user doc so old accounts appear in admin panel
+    await ref.set({
+      name,
+      email: fbUser.email,
+      role: data.role || 'viewer',
+      blocked: data.blocked || false,
+      lastLogin: new Date().toISOString()
+    }, { merge: true });
     currentUser = { uid: fbUser.uid, name, email: fbUser.email, role };
-    // Record login time
-    fbDb.collection('users').doc(fbUser.uid).update({ lastLogin: new Date().toISOString() }).catch(()=>{});
   } catch(e) {
     currentUser = { uid: fbUser.uid, name: fbUser.email.split('@')[0], email: fbUser.email, role: 'viewer' };
   }
@@ -877,10 +908,45 @@ function getData() {
   return _data;
 }
 
+let _hasUnsaved = false;
+
 function saveData(data) {
   _data = data;
+  // Save locally for instant reads
   if (currentUser) localStorage.setItem('mhlab_data_shared', JSON.stringify(data));
-  _saveRemote(data); // async, non-blocking
+  // Show unsaved bar instead of auto-saving to Firestore
+  _hasUnsaved = true;
+  const bar = document.getElementById('unsaved-bar');
+  if (bar) bar.style.display = 'flex';
+}
+
+async function saveAllChanges() {
+  const btn = document.getElementById('save-all-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...'; }
+  try {
+    await _saveRemote(_data);
+    _hasUnsaved = false;
+    const bar = document.getElementById('unsaved-bar');
+    if (bar) {
+      bar.style.background = 'linear-gradient(135deg,#065f46,#059669)';
+      bar.querySelector('span').innerHTML = '<i class="fas fa-circle-check" style="margin-right:6px;"></i> Saved for all users!';
+      bar.querySelector('div').style.display = 'none';
+      setTimeout(() => { bar.style.display = 'none'; bar.style.background = 'linear-gradient(135deg,#92400e,#d97706)'; }, 2500);
+    }
+  } catch(e) {
+    alert('Save failed: ' + e.message + '\nPlease try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Save for Everyone'; }
+  }
+}
+
+function discardChanges() {
+  if (!confirm('Discard all unsaved changes?')) return;
+  // Reload from Firestore
+  loadDataThenRender();
+  _hasUnsaved = false;
+  const bar = document.getElementById('unsaved-bar');
+  if (bar) bar.style.display = 'none';
 }
 
 function resetData() {
@@ -1374,6 +1440,8 @@ function buildTabBar() {
 }
 
 function switchTab(key) {
+  // Unsubscribe admin listener when leaving admin tab
+  if (key !== 'admin' && _adminUnsubscribe) { _adminUnsubscribe(); _adminUnsubscribe = null; }
   currentTab = key; searchQuery=''; filterVal='all'; currentPage=1; sortCol=''; sortDir=1;
   buildTabBar();
   renderTab(key);
@@ -1809,6 +1877,8 @@ function renderAnalytics() {
 // ================================================================
 // ADMIN PANEL
 // ================================================================
+let _adminUnsubscribe = null; // holds realtime listener
+
 async function renderAdminPanel() {
   if (!currentUser || currentUser.role !== 'admin') {
     document.getElementById('main-content').innerHTML = `
@@ -1818,18 +1888,21 @@ async function renderAdminPanel() {
   const mc = document.getElementById('main-content');
   mc.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
     <i class="fas fa-circle-notch fa-spin" style="color:var(--accent);font-size:20px;"></i>
-    <span style="color:var(--text2);">Loading users...</span></div>`;
+    <span style="color:var(--text2);">Loading users in real-time...</span></div>`;
 
-  try {
-    const snap = await fbDb.collection('users').get();
+  // Unsubscribe any previous listener
+  if (_adminUnsubscribe) { _adminUnsubscribe(); _adminUnsubscribe = null; }
+
+  // Real-time listener — admin panel updates the moment a new user signs in
+  _adminUnsubscribe = fbDb.collection('users').onSnapshot(snap => {
     const users = [];
     snap.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
     users.sort((a,b) => (b.lastLogin||'').localeCompare(a.lastLogin||''));
     renderAdminUI(users);
-  } catch(e) {
+  }, err => {
     mc.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>
-      <p>Failed to load users: ${e.message}</p></div>`;
-  }
+      <p>Failed to load users: ${err.message}</p></div>`;
+  });
 }
 
 function renderAdminUI(users) {
@@ -1965,6 +2038,13 @@ async function removeUser(uid, email) {
 // ================================================================
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeConfirm(); }
+});
+
+window.addEventListener('beforeunload', e => {
+  if (_hasUnsaved) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved changes. Save before leaving?';
+  }
 });
 document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 document.getElementById('login-pass').addEventListener('keydown',  e => { if(e.key==='Enter') doLogin(); });
