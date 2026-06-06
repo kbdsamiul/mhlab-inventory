@@ -1488,24 +1488,31 @@ function renderTab(key) {
     items = items.filter(item => Object.values(item).some(v => v && String(v).toLowerCase().includes(q)));
   }
   
-  // Expiry filter (chemicals/seeds)
-  if ((key==='chemicals'||key==='seeds') && filterVal !== 'all') {
-    items = items.filter(item => expiryStatus(item.expiry) === filterVal);
+  // Filter by category, location, condition, or expiry
+  const expiryVals = ['expired','expiring_soon','valid','unknown'];
+
+  if (key === 'chemicals' && filterVal !== 'all') {
+    if (expiryVals.includes(filterVal)) {
+      items = items.filter(item => expiryStatus(item.expiry) === filterVal);
+    } else {
+      items = items.filter(item => item.location === filterVal);
+    }
   }
-  
-  // Seed category filter
-  if (key==='seeds' && filterVal !== 'all' && !['expired','expiring_soon','valid','unknown'].includes(filterVal)) {
-    items = items.filter(item => item.category === filterVal);
+
+  if (key === 'seeds' && filterVal !== 'all') {
+    if (expiryVals.includes(filterVal)) {
+      items = items.filter(item => expiryStatus(item.expiry) === filterVal);
+    } else {
+      items = items.filter(item => item.category === filterVal);
+    }
   }
-  
-  // Equipment category filter
-  if (key==='equipment' && filterVal !== 'all') {
-    items = items.filter(item => item.category === filterVal || item.condition === filterVal);
-  }
-  
-  // Chemical location filter
-  if (key==='chemicals' && filterVal !== 'all' && !['expired','expiring_soon','valid','unknown'].includes(filterVal)) {
-    items = items.filter(item => item.location === filterVal);
+
+  if (key === 'equipment' && filterVal !== 'all') {
+    if (expiryVals.includes(filterVal)) {
+      items = items.filter(item => expiryStatus(item.expiry) === filterVal);
+    } else {
+      items = items.filter(item => item.category === filterVal || item.condition === filterVal);
+    }
   }
   
   // Sort
