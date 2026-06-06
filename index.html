@@ -39,7 +39,7 @@
 
   appId: "1:890657571551:web:fe2d98b875192b72831f6a"
 
-};;
+};
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -63,8 +63,10 @@
   onAuthStateChanged(auth, async (fbUser) => {
     if (fbUser) {
       if (!fbUser.emailVerified) {
-        // Show verification pending screen instead of app
-        window._showVerificationPending(fbUser);
+        // Defer to ensure DOM functions are ready
+        requestAnimationFrame(() => {
+          if (window._showVerificationPending) window._showVerificationPending(fbUser);
+        });
         return;
       }
       // Load user data from Firestore
@@ -496,7 +498,6 @@ tr:hover td { background: var(--surface2); }
 
 /* SCIENTIFIC ITALIC */
 .sci-name { font-style: italic; font-size: 12px; color: var(--text3); }
-</style>
 
 /* ADDITIONAL STYLES */
 .auth-info { background: var(--accent-light); color: var(--accent); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 16px; display: none; }
@@ -551,7 +552,9 @@ tr:hover td { background: var(--surface2); }
   display: none;
 }
 .firebase-notice strong { display: block; margin-bottom: 4px; }
+
 </style>
+
 </head>
 <body>
 
@@ -1090,8 +1093,9 @@ let _currentFirebaseUser = null;
 
 function _isFirebaseConfigured() {
   try {
-    return window._firebaseAuth && 
-           window._firebaseAuth.app.options.apiKey !== 'YOUR_API_KEY';
+    if (!window._firebaseAuth) return false;
+    const key = window._firebaseAuth.app.options.apiKey || '';
+    return key.length > 10 && key !== 'YOUR_API_KEY';
   } catch(e) { return false; }
 }
 
@@ -1933,14 +1937,19 @@ document.getElementById('login-pass').addEventListener('keydown', e => { if(e.ke
 document.getElementById('reg-pass').addEventListener('keydown', e => { if(e.key==='Enter') doRegister(); });
 
 // Firebase onAuthStateChanged handles initial login check.
-// If Firebase isn't configured, show auth screen after a short delay.
+// If Firebase is not configured, show auth screen quickly.
+// If it IS configured, onAuthStateChanged will hide the loader.
+// Safety net: hide loader after 4s no matter what.
 setTimeout(() => {
-  if (!_isFirebaseConfigured()) {
+  const loader = document.getElementById('loading-overlay');
+  if (loader && loader.style.display !== 'none') {
     showLoading(false);
-    document.getElementById('auth-screen').style.display = 'flex';
-    document.getElementById('firebase-notice').style.display = 'block';
+    if (!_isFirebaseConfigured()) {
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('firebase-notice').style.display = 'block';
+    }
   }
-}, 2000);
+}, 4000);
 
 </script>
 </body>
