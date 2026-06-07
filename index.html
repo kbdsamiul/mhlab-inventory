@@ -2808,7 +2808,8 @@ function buildFormHtml(fields, item) {
     } else if (f.type === 'textarea') {
       input = `<textarea name="${f.key}">${val}</textarea>`;
     } else {
-      input = `<input type="${f.type||'text'}" name="${f.key}" value="${val}" ${f.required?'required':''}>`;
+      const placeholder = f.placeholder ? `placeholder="${f.placeholder}"` : '';
+      input = `<input type="${f.type==='url'?'url':'text'}" name="${f.key}" value="${val}" ${placeholder} ${f.required?'required':''}${f.type==='url'?' style="color:var(--accent);"':''}>`;
     }
     return `<div class="field-group${f.full?' full':''}"><label>${f.label}${f.required?'*':''}</label>${input}</div>`;
   }).join('')}</div>`;
