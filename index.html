@@ -2621,11 +2621,11 @@ function renderTable(key, items) {
 
 function getHeaders(key) {
   const map = {
-    chemicals: [{key:'name',label:'Chemical Name'},{key:'formula',label:'Formula'},{key:'cas',label:'CAS No.'},{key:'amount',label:'Amount'},{key:'company',label:'Company'},{key:'location',label:'Location'},{key:'expiry',label:'Expiry'}],
-    equipment: [{key:'name',label:'Equipment'},{key:'model',label:'Model'},{key:'company',label:'Manufacturer'},{key:'category',label:'Category'},{key:'condition',label:'Condition'},{key:'battery',label:'Battery'}],
+    chemicals: [{key:'name',label:'Chemical Name'},{key:'formula',label:'Formula'},{key:'cas',label:'CAS No.'},{key:'amount',label:'Amount'},{key:'company',label:'Company'},{key:'location',label:'Location'},{key:'expiry',label:'Expiry'},{key:'url',label:'Reference URL (optional)',type:'url',full:true,placeholder:'https://www.sigmaaldrich.com/...'}],
+    equipment: [{key:'name',label:'Equipment'},{key:'model',label:'Model'},{key:'company',label:'Manufacturer'},{key:'category',label:'Category'},{key:'condition',label:'Condition'},{key:'battery',label:'Battery'},{key:'url',label:'Reference URL (optional)',type:'url',full:true,placeholder:'https://www.fishersci.com/...'}],
     seeds: [{key:'name',label:'Name'},{key:'sciName',label:'Scientific Name'},{key:'variety',label:'Variety'},{key:'category',label:'Category'},{key:'weight',label:'Weight (g)'},{key:'packetNo',label:'Packets'},{key:'expiry',label:'Expiry'}],
     glassware: [{key:'name',label:'Item Name'},{key:'volume',label:'Volume'},{key:'quantity',label:'Qty'},{key:'location',label:'Location'}],
-    books: [{key:'name',label:'Book Title'},{key:'author',label:'Author'},{key:'publisher',label:'Publisher'},{key:'year',label:'Year'},{key:'edition',label:'Edition'},{key:'quantity',label:'Copy'},{key:'category',label:'Shelf & Row'}],
+    books: [{key:'name',label:'Book Title'},{key:'author',label:'Author'},{key:'publisher',label:'Publisher'},{key:'year',label:'Year'},{key:'edition',label:'Edition'},{key:'quantity',label:'Copy'},{key:'category',label:'Shelf & Row'},{key:'url',label:'Book URL / DOI (optional)',type:'url',full:true,placeholder:'https://doi.org/... or https://books.google.com/...'}],
     students: [{key:'name',label:'Name'},{key:'degree',label:'Degree'},{key:'regNo',label:'Reg. No.'},{key:'phone',label:'Phone'},{key:'email',label:'Email'},{key:'hall',label:'Hall'},{key:'department',label:'Dept.'},{key:'status',label:'Status'}]
   };
   return map[key] || [];
@@ -2635,7 +2635,7 @@ function renderRow(key, item) {
   let cells = '';
   if (key === 'chemicals') {
     cells = `
-      <td><span class="item-link" onclick="openDetailModal('chemicals',${item.id})" title="View Details">${escHtml(item.name)}</span>${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
+      <td><span class="item-link" onclick="${item.url ? `window.open('${item.url.replace(/'/g,"\\'")}','_blank')` : `openDetailModal('chemicals',${item.id})`}" title="${item.url ? 'Open Reference Page' : 'View Details'}">${escHtml(item.name)}</span>${item.url ? '<i class="fas fa-external-link-alt" style="font-size:9px;color:var(--text3);margin-left:4px;"></i>' : ''}${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
       <td class="mono">${escHtml(item.formula)}</td>
       <td class="mono">${escHtml(item.cas)}</td>
       <td>${escHtml(item.amount)}</td>
@@ -2644,7 +2644,7 @@ function renderRow(key, item) {
       <td>${expiryBadge(item.expiry)}${item.expiry?`<div class="mono" style="font-size:10px;margin-top:2px;">${item.expiry}</div>`:''}</td>`;
   } else if (key === 'equipment') {
     cells = `
-      <td><span class="item-link" onclick="openDetailModal('equipment',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
+      <td><span class="item-link" onclick="${item.url ? `window.open('${item.url.replace(/'/g,"\\'")}','_blank')` : `openDetailModal('equipment',${item.id})`}" title="${item.url ? 'Open Reference Page' : 'View Details'}">${escHtml(item.name)}</span>${item.url ? '<i class="fas fa-external-link-alt" style="font-size:9px;color:var(--text3);margin-left:4px;"></i>' : ''}</td>
       <td class="mono">${escHtml(item.model)}</td>
       <td>${escHtml(item.company)}</td>
       <td><span class="badge badge-blue">${escHtml(item.category)}</span></td>
@@ -2667,7 +2667,7 @@ function renderRow(key, item) {
       <td>${escHtml(item.location)}</td>`;
   } else if (key === 'books') {
     cells = `
-      <td><span class="item-link" onclick="openDetailModal('books',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
+      <td><span class="item-link" onclick="${item.url ? `window.open('${item.url.replace(/'/g,"\\'")}','_blank')` : `openDetailModal('books',${item.id})`}" title="${item.url ? 'Open Reference Page' : 'View Details'}">${escHtml(item.name)}</span>${item.url ? '<i class="fas fa-external-link-alt" style="font-size:9px;color:var(--text3);margin-left:4px;"></i>' : ''}</td>
       <td style="font-size:12px;">${escHtml(item.author||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.publisher||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.year||'—')}</td>
@@ -3245,19 +3245,12 @@ function openDetailModal(key, id) {
         </div>
         ${item.notes ? `<div class="detail-field full"><div class="detail-label">Notes</div><div class="detail-value">${escHtml(item.notes)}</div></div>` : ''}
       </div>
-      <div class="detail-divider"><i class="fas fa-globe"></i> Search Online</div>
+      ${item.url ? `<div class="detail-divider"><i class="fas fa-globe"></i> Reference Link</div>
       <div>
-        <a class="search-link-btn" href="https://www.sigmaaldrich.com/BD/en/search#q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
-          <i class="fas fa-flask"></i> Sigma-Aldrich
+        <a class="search-link-btn" href="${escHtml(item.url)}" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt"></i> Open Reference Page
         </a>
-        <a class="search-link-btn" href="https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
-          <i class="fas fa-atom"></i> PubChem
-        </a>
-        <a class="search-link-btn" href="https://www.chemspider.com/Search.aspx?q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
-          <i class="fas fa-vial"></i> ChemSpider
-        </a>
-        ${item.cas ? `<a class="search-link-btn" href="https://commonchemistry.cas.org/detail?ref=${encodeURIComponent(item.cas)}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> CAS Registry</a>` : ''}
-      </div>`;
+      </div>` : ''}`;
     document.getElementById('modal-title').innerHTML = `<i class="fas fa-flask" style="color:var(--accent);margin-right:8px;"></i> Chemical Details`;
   }
 
@@ -3294,18 +3287,12 @@ function openDetailModal(key, id) {
         </div>
         ${item.notes ? `<div class="detail-field full"><div class="detail-label">Notes</div><div class="detail-value">${escHtml(item.notes)}</div></div>` : ''}
       </div>
-      <div class="detail-divider"><i class="fas fa-globe"></i> Search Online</div>
+      ${item.url ? `<div class="detail-divider"><i class="fas fa-globe"></i> Reference Link</div>
       <div>
-        <a class="search-link-btn" href="https://www.google.com/search?q=${encodeURIComponent((item.name||'')+ ' ' + (item.model||'') + ' laboratory equipment')}" target="_blank" rel="noopener">
-          <i class="fab fa-google"></i> Google Search
+        <a class="search-link-btn" href="${escHtml(item.url)}" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt"></i> Open Reference Page
         </a>
-        <a class="search-link-btn" href="https://www.fishersci.com/us/en/catalog/search/products?query=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
-          <i class="fas fa-microscope"></i> Fisher Scientific
-        </a>
-        <a class="search-link-btn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(item.name + ' how to use laboratory')}" target="_blank" rel="noopener">
-          <i class="fab fa-youtube" style="color:#ff0000;"></i> How-to Video
-        </a>
-      </div>`;
+      </div>` : ''}`;
     document.getElementById('modal-title').innerHTML = `<i class="fas fa-microscope" style="color:var(--teal);margin-right:8px;"></i> Equipment Details`;
   }
 
@@ -3345,21 +3332,12 @@ function openDetailModal(key, id) {
           <div class="detail-value"><span class="badge" style="background:#f0fdf4;color:#166534;font-weight:700;">${escHtml(item.category||'—')}</span></div>
         </div>
       </div>
-      <div class="detail-divider"><i class="fas fa-globe"></i> Find Online</div>
+      ${item.url ? `<div class="detail-divider"><i class="fas fa-globe"></i> Reference Link</div>
       <div>
-        <a class="search-link-btn" href="https://scholar.google.com/scholar?q=${encodeURIComponent(item.name + ' ' + (item.author||''))}" target="_blank" rel="noopener">
-          <i class="fas fa-graduation-cap"></i> Google Scholar
+        <a class="search-link-btn" href="${escHtml(item.url)}" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt"></i> Open Book / DOI Page
         </a>
-        <a class="search-link-btn" href="https://www.worldcat.org/search?q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
-          <i class="fas fa-globe"></i> WorldCat
-        </a>
-        <a class="search-link-btn" href="https://openlibrary.org/search?q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
-          <i class="fas fa-book-open"></i> Open Library
-        </a>
-        <a class="search-link-btn" href="https://www.google.com/search?q=${encodeURIComponent(item.name + ' ' + (item.author||'') + ' PDF')}" target="_blank" rel="noopener">
-          <i class="fas fa-file-pdf" style="color:#dc2626;"></i> Find PDF
-        </a>
-      </div>`;
+      </div>` : ''}`;
     document.getElementById('modal-title').innerHTML = `<i class="fas fa-book" style="color:var(--yellow);margin-right:8px;"></i> Book Details`;
   }
 
