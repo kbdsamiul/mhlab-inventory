@@ -314,6 +314,63 @@ tr:last-child td { border-bottom: none; }
 tr:hover td { background: linear-gradient(135deg, #f8faff, #f5f3ff); }
 .mono { font-family: var(--mono); font-size: 12px; }
 
+/* ── CLICKABLE ITEM LINK ─────────────────────────── */
+.item-link {
+  font-weight: 700; color: var(--accent);
+  cursor: pointer; text-decoration: none;
+  border-bottom: 1.5px dashed var(--accent2);
+  transition: all .15s; padding-bottom: 1px;
+  display: inline;
+}
+.item-link:hover {
+  color: var(--purple); border-bottom-color: var(--purple);
+}
+
+/* ── DETAIL MODAL EXTRAS ────────────────────────── */
+.detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+.detail-grid .full { grid-column: 1 / -1; }
+.detail-field { display: flex; flex-direction: column; gap: 4px; }
+.detail-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--text3);
+}
+.detail-value {
+  font-size: 14px; color: var(--text); font-weight: 500;
+  word-break: break-word;
+}
+.detail-value.mono { font-family: var(--mono); font-size: 13px; }
+.detail-hero {
+  background: linear-gradient(135deg, #f0f4ff, #ede9fe);
+  border-radius: 10px; padding: 18px; margin-bottom: 20px;
+  border: 1.5px solid var(--border);
+}
+.detail-hero-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 20px; font-weight: 800; color: var(--ink);
+  margin-bottom: 6px; line-height: 1.3;
+}
+.detail-hero-sub { font-size: 13px; color: var(--text2); }
+.detail-divider {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--accent); margin: 18px 0 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.detail-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.search-link-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px; font-size: 12px;
+  font-weight: 600; text-decoration: none; cursor: pointer;
+  border: 1.5px solid var(--border); background: white;
+  color: var(--text2); transition: all .2s; font-family: var(--font);
+  margin-top: 8px; margin-right: 6px;
+}
+.search-link-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+@media (max-width: 500px) { .detail-grid { grid-template-columns: 1fr; } }
+
 /* ── BADGES ──────────────────────────────────────── */
 .badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -2578,7 +2635,7 @@ function renderRow(key, item) {
   let cells = '';
   if (key === 'chemicals') {
     cells = `
-      <td><strong>${escHtml(item.name)}</strong>${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
+      <td><span class="item-link" onclick="openDetailModal('chemicals',${item.id})" title="View Details">${escHtml(item.name)}</span>${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
       <td class="mono">${escHtml(item.formula)}</td>
       <td class="mono">${escHtml(item.cas)}</td>
       <td>${escHtml(item.amount)}</td>
@@ -2587,7 +2644,7 @@ function renderRow(key, item) {
       <td>${expiryBadge(item.expiry)}${item.expiry?`<div class="mono" style="font-size:10px;margin-top:2px;">${item.expiry}</div>`:''}</td>`;
   } else if (key === 'equipment') {
     cells = `
-      <td><strong>${escHtml(item.name)}</strong></td>
+      <td><span class="item-link" onclick="openDetailModal('equipment',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
       <td class="mono">${escHtml(item.model)}</td>
       <td>${escHtml(item.company)}</td>
       <td><span class="badge badge-blue">${escHtml(item.category)}</span></td>
@@ -2610,7 +2667,7 @@ function renderRow(key, item) {
       <td>${escHtml(item.location)}</td>`;
   } else if (key === 'books') {
     cells = `
-      <td><strong>${escHtml(item.name)}</strong></td>
+      <td><span class="item-link" onclick="openDetailModal('books',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
       <td style="font-size:12px;">${escHtml(item.author||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.publisher||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.year||'—')}</td>
@@ -3137,6 +3194,182 @@ async function removeUser(uid, email) {
     await fbDb.collection('users').doc(uid).delete().catch(()=>{});
     // onSnapshot will auto-refresh the UI
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ================================================================
+// DETAIL VIEW MODAL
+// ================================================================
+
+function openDetailModal(key, id) {
+  const data = getData();
+  const item = (data[key] || []).find(i => i.id === id);
+  if (!item) return;
+
+  let content = '';
+
+  if (key === 'chemicals') {
+    const expStatus = expiryStatus(item.expiry);
+    const expColor = {expired:'#dc2626', expiring_soon:'#d97706', valid:'#059669', unknown:'#6b7280'}[expStatus];
+    content = `
+      <div class="detail-hero">
+        <div class="detail-hero-name">${escHtml(item.name)}</div>
+        <div class="detail-hero-sub">
+          ${item.formula ? `<span style="font-family:var(--mono);font-weight:600;color:var(--accent);">${escHtml(item.formula)}</span>` : ''}
+          ${item.cas ? ` &nbsp;·&nbsp; CAS: <span style="font-family:var(--mono);">${escHtml(item.cas)}</span>` : ''}
+        </div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-field">
+          <div class="detail-label">Amount / Quantity</div>
+          <div class="detail-value mono">${escHtml(item.amount||'—')} ${escHtml(item.unit||'')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Company / Brand</div>
+          <div class="detail-value">${escHtml(item.company||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Location</div>
+          <div class="detail-value">${locationBadge(item.location)||escHtml(item.location||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Purity / Grade</div>
+          <div class="detail-value mono">${escHtml(item.purity||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Expiry Date</div>
+          <div class="detail-value">${expiryBadge(item.expiry)} <span style="font-size:12px;color:var(--text3);">${item.expiry||'Not set'}</span></div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Molecular Weight</div>
+          <div class="detail-value mono">${escHtml(item.mw||'—')}</div>
+        </div>
+        ${item.notes ? `<div class="detail-field full"><div class="detail-label">Notes</div><div class="detail-value">${escHtml(item.notes)}</div></div>` : ''}
+      </div>
+      <div class="detail-divider"><i class="fas fa-globe"></i> Search Online</div>
+      <div>
+        <a class="search-link-btn" href="https://www.sigmaaldrich.com/BD/en/search#q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
+          <i class="fas fa-flask"></i> Sigma-Aldrich
+        </a>
+        <a class="search-link-btn" href="https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
+          <i class="fas fa-atom"></i> PubChem
+        </a>
+        <a class="search-link-btn" href="https://www.chemspider.com/Search.aspx?q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
+          <i class="fas fa-vial"></i> ChemSpider
+        </a>
+        ${item.cas ? `<a class="search-link-btn" href="https://commonchemistry.cas.org/detail?ref=${encodeURIComponent(item.cas)}" target="_blank" rel="noopener"><i class="fas fa-id-card"></i> CAS Registry</a>` : ''}
+      </div>`;
+    document.getElementById('modal-title').innerHTML = `<i class="fas fa-flask" style="color:var(--accent);margin-right:8px;"></i> Chemical Details`;
+  }
+
+  else if (key === 'equipment') {
+    content = `
+      <div class="detail-hero">
+        <div class="detail-hero-name">${escHtml(item.name)}</div>
+        <div class="detail-hero-sub">${item.model ? `Model: <strong>${escHtml(item.model)}</strong>` : ''} ${item.company ? ` &nbsp;·&nbsp; ${escHtml(item.company)}` : ''}</div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-field">
+          <div class="detail-label">Category</div>
+          <div class="detail-value"><span class="badge badge-blue">${escHtml(item.category||'—')}</span></div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Condition</div>
+          <div class="detail-value">${conditionBadge(item.condition)}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Quantity</div>
+          <div class="detail-value mono">${escHtml(String(item.quantity||'1'))}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Location</div>
+          <div class="detail-value">${escHtml(item.location||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Battery / Power</div>
+          <div class="detail-value mono">${escHtml(item.battery||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Serial / ID</div>
+          <div class="detail-value mono">${escHtml(item.serial||'—')}</div>
+        </div>
+        ${item.notes ? `<div class="detail-field full"><div class="detail-label">Notes</div><div class="detail-value">${escHtml(item.notes)}</div></div>` : ''}
+      </div>
+      <div class="detail-divider"><i class="fas fa-globe"></i> Search Online</div>
+      <div>
+        <a class="search-link-btn" href="https://www.google.com/search?q=${encodeURIComponent((item.name||'')+ ' ' + (item.model||'') + ' laboratory equipment')}" target="_blank" rel="noopener">
+          <i class="fab fa-google"></i> Google Search
+        </a>
+        <a class="search-link-btn" href="https://www.fishersci.com/us/en/catalog/search/products?query=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
+          <i class="fas fa-microscope"></i> Fisher Scientific
+        </a>
+        <a class="search-link-btn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(item.name + ' how to use laboratory')}" target="_blank" rel="noopener">
+          <i class="fab fa-youtube" style="color:#ff0000;"></i> How-to Video
+        </a>
+      </div>`;
+    document.getElementById('modal-title').innerHTML = `<i class="fas fa-microscope" style="color:var(--teal);margin-right:8px;"></i> Equipment Details`;
+  }
+
+  else if (key === 'books') {
+    content = `
+      <div class="detail-hero">
+        <div class="detail-hero-name">${escHtml(item.name)}</div>
+        <div class="detail-hero-sub">${item.author ? `by <strong>${escHtml(item.author)}</strong>` : ''}</div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-field">
+          <div class="detail-label">Publisher</div>
+          <div class="detail-value">${escHtml(item.publisher||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Year</div>
+          <div class="detail-value mono">${escHtml(item.year||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Edition</div>
+          <div class="detail-value">${escHtml(item.edition||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">No. of Copies</div>
+          <div class="detail-value"><span class="badge badge-blue">${escHtml(item.quantity||'1')}</span></div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Shelf</div>
+          <div class="detail-value mono">${escHtml(item.shelf||'—')}</div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Row</div>
+          <div class="detail-value mono">${escHtml(item.row||'—')}</div>
+        </div>
+        <div class="detail-field full">
+          <div class="detail-label">Location</div>
+          <div class="detail-value"><span class="badge" style="background:#f0fdf4;color:#166534;font-weight:700;">${escHtml(item.category||'—')}</span></div>
+        </div>
+      </div>
+      <div class="detail-divider"><i class="fas fa-globe"></i> Find Online</div>
+      <div>
+        <a class="search-link-btn" href="https://scholar.google.com/scholar?q=${encodeURIComponent(item.name + ' ' + (item.author||''))}" target="_blank" rel="noopener">
+          <i class="fas fa-graduation-cap"></i> Google Scholar
+        </a>
+        <a class="search-link-btn" href="https://www.worldcat.org/search?q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
+          <i class="fas fa-globe"></i> WorldCat
+        </a>
+        <a class="search-link-btn" href="https://openlibrary.org/search?q=${encodeURIComponent(item.name)}" target="_blank" rel="noopener">
+          <i class="fas fa-book-open"></i> Open Library
+        </a>
+        <a class="search-link-btn" href="https://www.google.com/search?q=${encodeURIComponent(item.name + ' ' + (item.author||'') + ' PDF')}" target="_blank" rel="noopener">
+          <i class="fas fa-file-pdf" style="color:#dc2626;"></i> Find PDF
+        </a>
+      </div>`;
+    document.getElementById('modal-title').innerHTML = `<i class="fas fa-book" style="color:var(--yellow);margin-right:8px;"></i> Book Details`;
+  }
+
+  // Show modal footer with edit button for admin/editor
+  const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'editor');
+  document.getElementById('modal-body').innerHTML = content;
+  document.getElementById('modal-save-btn').style.display = canEdit ? '' : 'none';
+  document.getElementById('modal-save-btn').textContent = 'Edit';
+  document.getElementById('modal-save-btn').onclick = () => { closeModal(); openEditModal(key, id); };
+  document.getElementById('modal-overlay').classList.add('open');
 }
 
 // ================================================================
