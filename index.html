@@ -626,6 +626,27 @@ tr:hover td { background: linear-gradient(135deg, #f8faff, #f5f3ff); }
   </div>
   <div class="tab-bar" id="tab-bar"></div>
   <main id="main-content"></main>
+
+  <!-- FOOTER: Last Updated -->
+  <footer id="app-footer" style="
+    background: white;
+    border-top: 1.5px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  ">
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);">
+      <i class="fas fa-clock" style="color:var(--accent);"></i>
+      <span>Last updated:</span>
+      <span id="last-updated-display" style="font-weight:600;color:var(--text2);">—</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);">
+      <span id="last-updated-by" style="font-style:italic;"></span>
+    </div>
+  </footer>
 </div>
 
 <!-- MODAL -->
@@ -970,6 +991,8 @@ async function loadDataThenRender() {
     const snap = await fbDb.collection('labdata').doc('shared').get();
     if (snap.exists) {
       _data = snap.data().inventory;
+      // Show last updated info in footer
+      if (snap.data().meta) updateFooterDisplay(snap.data().meta);
     } else {
       _data = JSON.parse(JSON.stringify(DEFAULT_DATA));
       await _saveRemote(_data);
@@ -2932,9 +2955,15 @@ async function reloadDefaultDataToFirestore() {
   if (!confirm('This will REPLACE all shared inventory data with the default data (including 793 books).\n\nAll current changes will be lost. Continue?')) return;
   try {
     const defaults = JSON.parse(JSON.stringify(DEFAULT_DATA));
-    await fbDb.collection('labdata').doc('shared').set({ inventory: defaults });
+    const meta = {
+      lastUpdated: new Date().toISOString(),
+      lastUpdatedBy: currentUser ? currentUser.name : 'Admin',
+      lastUpdatedEmail: currentUser ? currentUser.email : ''
+    };
+    await fbDb.collection('labdata').doc('shared').set({ inventory: defaults, meta });
     localStorage.setItem('mhlab_data_shared', JSON.stringify(defaults));
     _data = defaults;
+    updateFooterDisplay(meta);
     alert('✅ Done! All 793 books and default inventory loaded for everyone.');
     buildTabBar();
     renderTab('books');
