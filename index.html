@@ -2610,7 +2610,17 @@ function renderPagination(page, totalPages, total) {
 }
 
 function goPage(p) { currentPage = p; renderTab(currentTab); }
-function doSearch(v) { searchQuery = v; currentPage = 1; renderTab(currentTab); }
+function doSearch(v) {
+  searchQuery = v;
+  currentPage = 1;
+  renderTab(currentTab);
+  // Restore focus to search box and cursor position after re-render
+  const inp = document.querySelector('.search-input');
+  if (inp) {
+    inp.focus();
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  }
+}
 function doFilter(v) { filterVal = v; currentPage = 1; renderTab(currentTab); }
 function doSort(col) {
   if (sortCol === col) sortDir *= -1;
