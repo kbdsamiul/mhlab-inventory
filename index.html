@@ -1016,9 +1016,47 @@ async function loadDataThenRender() {
 
 async function _saveRemote(data) {
   try {
-    await fbDb.collection('labdata').doc('shared').set({ inventory: data });
+    const meta = {
+      lastUpdated: new Date().toISOString(),
+      lastUpdatedBy: currentUser ? currentUser.name : 'Unknown',
+      lastUpdatedEmail: currentUser ? currentUser.email : ''
+    };
+    await fbDb.collection('labdata').doc('shared').set({ inventory: data, meta });
+    updateFooterDisplay(meta);
   } catch(e) {
     console.warn('Firestore save failed:', e.message);
+  }
+}
+
+function updateFooterDisplay(meta) {
+  if (!meta || !meta.lastUpdated) return;
+  const el  = document.getElementById('last-updated-display');
+  const byEl = document.getElementById('last-updated-by');
+  if (!el) return;
+
+  const dt      = new Date(meta.lastUpdated);
+  const now     = new Date();
+  const diffMs  = now - dt;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr  = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
+
+  let relative = '';
+  if (diffMin < 1)       relative = 'just now';
+  else if (diffMin < 60) relative = diffMin + ' min ago';
+  else if (diffHr < 24)  relative = diffHr + ' hr ago';
+  else if (diffDay === 1) relative = 'yesterday';
+  else if (diffDay < 7)  relative = diffDay + ' days ago';
+  else relative = dt.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+
+  const absolute = dt.toLocaleString('en-GB', {
+    day:'numeric', month:'short', year:'numeric',
+    hour:'2-digit', minute:'2-digit'
+  });
+
+  el.textContent = absolute + '  (' + relative + ')';
+  if (byEl && meta.lastUpdatedBy) {
+    byEl.textContent = 'by ' + meta.lastUpdatedBy;
   }
 }
 
@@ -2886,7 +2924,7 @@ function renderAdminUI(users) {
         <div style="font-size:12px;opacity:0.8;">User ID: <code style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;">MHLAB_ADMIN_49706929</code>
         &nbsp; Password: <code style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;">mn6UI6UJ83oXvaxh</code></div>
       </div>
-      <button onclick="reloadDefaultDataToFirestore()" style="padding:9px 18px;background:white;color:#1e1b4b;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;">
+      <button id="reload-defaults-btn" onclick="reloadDefaultDataToFirestore()" style="padding:9px 18px;background:white;color:#1e1b4b;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;${localStorage.getItem('mhlab_books_loaded')==='true'?'display:none;':''}">
         <i class="fas fa-cloud-arrow-up"></i> Reload 793 Books to Cloud
       </button>
     </div>
@@ -2963,7 +3001,11 @@ async function reloadDefaultDataToFirestore() {
     await fbDb.collection('labdata').doc('shared').set({ inventory: defaults, meta });
     localStorage.setItem('mhlab_data_shared', JSON.stringify(defaults));
     _data = defaults;
-    updateFooterDisplay(meta);
+    setTimeout(() => updateFooterDisplay(meta), 100);
+    // Hide the reload button - no longer needed
+    const reloadBtn = document.getElementById('reload-defaults-btn');
+    if (reloadBtn) reloadBtn.style.display = 'none';
+    localStorage.setItem('mhlab_books_loaded', 'true');
     alert('✅ Done! All 793 books and default inventory loaded for everyone.');
     buildTabBar();
     renderTab('books');
