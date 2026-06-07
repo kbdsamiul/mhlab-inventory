@@ -2959,9 +2959,14 @@ function renderAdminUI(users) {
     <div class="table-wrap">
       <div class="table-info" style="display:flex;align-items:center;justify-content:space-between;">
         <span><i class="fas fa-users" style="color:var(--accent);margin-right:6px;"></i> <strong>${totalUsers}</strong> registered users</span>
-        <button onclick="renderAdminPanel()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;">
-          <i class="fas fa-refresh"></i> Refresh
-        </button>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <button onclick="syncMissingUsers()" id="sync-btn" style="background:var(--accent-light);border:none;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;">
+            <i class="fas fa-rotate"></i> Sync Missing Users
+          </button>
+          <button onclick="renderAdminPanel()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;">
+            <i class="fas fa-refresh"></i> Refresh
+          </button>
+        </div>
       </div>
       <div class="table-scroll">
         <table>
@@ -3022,6 +3027,53 @@ async function reloadDefaultDataToFirestore() {
     switchTab('books');
   } catch(e) {
     alert('Error: ' + e.message);
+  }
+}
+
+async function syncMissingUsers() {
+  const btn = document.getElementById('sync-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Syncing...'; }
+
+  try {
+    // Read all user docs from users/ collection
+    const usersSnap = await fbDb.collection('users').get();
+    if (usersSnap.empty) {
+      alert('No users found in users/ collection.');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-rotate"></i> Sync Missing Users'; }
+      return;
+    }
+
+    // Read current registry
+    const registrySnap = await fbDb.collection('meta').doc('users').get();
+    const registry = registrySnap.exists ? registrySnap.data() : {};
+
+    // Find users missing from registry
+    const updates = {};
+    let count = 0;
+    usersSnap.forEach(doc => {
+      if (!registry[doc.id]) {
+        const d = doc.data();
+        updates[doc.id] = {
+          name:  d.name  || d.email?.split('@')[0] || 'Unknown',
+          email: d.email || '',
+          role:  d.role  || 'viewer',
+          blocked: d.blocked || false,
+          lastLogin: d.lastLogin || new Date().toISOString()
+        };
+        count++;
+      }
+    });
+
+    if (count === 0) {
+      alert('✅ All users are already in sync! No missing users found.');
+    } else {
+      await fbDb.collection('meta').doc('users').set(updates, { merge: true });
+      alert('✅ Synced ' + count + ' missing user(s) to the admin panel!');
+    }
+  } catch(e) {
+    alert('Sync failed: ' + e.message + '\n\nThis may be a Firestore permissions issue. Make sure rules allow reading the users/ collection.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-rotate"></i> Sync Missing Users'; }
   }
 }
 
