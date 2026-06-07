@@ -250,6 +250,39 @@ main { flex: 1; padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; d
 }
 .btn-reset:hover { border-color: var(--orange); color: var(--orange); }
 
+/* ── DOWNLOAD DROPDOWN ───────────────────────────── */
+.download-wrap { position: relative; }
+.btn-download {
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: white; border: none; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font); transition: all .2s; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(124,58,237,0.35);
+}
+.btn-download:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(124,58,237,0.45); }
+.download-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: white; border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg); border: 1.5px solid var(--border);
+  min-width: 180px; z-index: 200; overflow: hidden;
+  display: none;
+}
+.download-menu.open { display: block; animation: menuIn .15s ease; }
+@keyframes menuIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.download-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 16px; font-size: 13px; font-weight: 500;
+  cursor: pointer; color: var(--text); transition: background .15s;
+  border: none; background: none; width: 100%; font-family: var(--font);
+}
+.download-item:hover { background: var(--bg); }
+.download-item .di { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.di-csv  { background: #d1fae5; color: #065f46; }
+.di-xlsx { background: #dbeafe; color: #1e40af; }
+.di-pdf  { background: #fee2e2; color: #991b1b; }
+
 /* ── TABLE ───────────────────────────────────────── */
 .table-wrap {
   background: white; border-radius: var(--radius);
@@ -2463,6 +2496,24 @@ function renderTab(key) {
       ${(currentUser && currentUser.role==='admin') ? `
         <button class="btn-reset" onclick="resetData()" title="Reset to default data"><i class="fas fa-rotate-left"></i> Reset</button>
       ` : ''}
+      ${(currentUser && (currentUser.role==='admin'||currentUser.role==='editor')) ? `
+        <div class="download-wrap" id="dl-wrap-${key}">
+          <button class="btn-download" onclick="toggleDownloadMenu('${key}')">
+            <i class="fas fa-download"></i> Download
+          </button>
+          <div class="download-menu" id="dl-menu-${key}">
+            <button class="download-item" onclick="downloadCSV('${key}')">
+              <span class="di di-csv">CSV</span> CSV Spreadsheet
+            </button>
+            <button class="download-item" onclick="downloadXLSX('${key}')">
+              <span class="di di-xlsx"><i class='fas fa-table'></i></span> Excel (.xlsx)
+            </button>
+            <button class="download-item" onclick="downloadPDF('${key}')">
+              <span class="di di-pdf"><i class='fas fa-file-pdf'></i></span> PDF Document
+            </button>
+          </div>
+        </div>
+      ` : ''}
     </div>
     <div class="table-wrap">
       <div class="table-info">Showing ${paged.length} of ${total} ${key}</div>
@@ -3086,6 +3137,206 @@ async function removeUser(uid, email) {
     await fbDb.collection('users').doc(uid).delete().catch(()=>{});
     // onSnapshot will auto-refresh the UI
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ================================================================
+// DOWNLOAD FUNCTIONS (CSV, XLSX, PDF)
+// ================================================================
+
+// Column definitions per tab (what to export)
+const EXPORT_COLS = {
+  chemicals: ['name','formula','cas','amount','unit','company','location','expiry','notes'],
+  equipment:  ['name','model','category','quantity','condition','location','notes'],
+  seeds:      ['name','category','weight','unit','source','expiry','notes'],
+  glassware:  ['name','volume','quantity','location','notes'],
+  books:      ['name','author','publisher','year','edition','quantity','shelf','row','category'],
+  students:   ['name','degree','regNo','phone','email','hall','department','status'],
+};
+
+const EXPORT_LABELS = {
+  chemicals: ['Name','Formula','CAS No.','Amount','Unit','Company','Location','Expiry','Notes'],
+  equipment:  ['Name','Model','Category','Qty','Condition','Location','Notes'],
+  seeds:      ['Name','Category','Weight','Unit','Source','Expiry','Notes'],
+  glassware:  ['Name','Volume','Qty','Location','Notes'],
+  books:      ['Book Title','Author','Publisher','Year','Edition','Copies','Shelf','Row','Location'],
+  students:   ['Name','Degree','Reg. No.','Phone','Email','Hall','Department','Status'],
+};
+
+function getExportData(key) {
+  const data = getData();
+  const items = data[key] || [];
+  const cols  = EXPORT_COLS[key]  || Object.keys(items[0]||{}).filter(k=>k!=='id');
+  const labels = EXPORT_LABELS[key] || cols;
+  return { items, cols, labels };
+}
+
+function toggleDownloadMenu(key) {
+  // Close all other menus
+  document.querySelectorAll('.download-menu').forEach(m => {
+    if (m.id !== 'dl-menu-' + key) m.classList.remove('open');
+  });
+  const menu = document.getElementById('dl-menu-' + key);
+  if (menu) menu.classList.toggle('open');
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.download-wrap')) {
+    document.querySelectorAll('.download-menu').forEach(m => m.classList.remove('open'));
+  }
+});
+
+// ── CSV ──────────────────────────────────────────────────────────
+function downloadCSV(key) {
+  const { items, cols, labels } = getExportData(key);
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const rows = [labels.join(',')];
+  items.forEach(item => rows.push(cols.map(c => esc(item[c]||'')).join(',')));
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  triggerDownload(blob, `MHLab_${key}_${today()}.csv`);
+  closeMenu(key);
+}
+
+// ── XLSX (manual XML-based) ──────────────────────────────────────
+function downloadXLSX(key) {
+  const { items, cols, labels } = getExportData(key);
+
+  const escXml = s => String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+
+  // Build worksheet XML
+  let wsData = '<sheetData>';
+  // Header row
+  wsData += '<row r="1">' + labels.map((l, i) =>
+    `<c r="${colLetter(i)}1" t="inlineStr"><is><t>${escXml(l)}</t></is></c>`
+  ).join('') + '</row>';
+  // Data rows
+  items.forEach((item, ri) => {
+    wsData += `<row r="${ri+2}">` + cols.map((c, ci) => {
+      const val = item[c] || '';
+      const num = !isNaN(val) && val !== '' && val !== null;
+      return num
+        ? `<c r="${colLetter(ci)}${ri+2}"><v>${val}</v></c>`
+        : `<c r="${colLetter(ci)}${ri+2}" t="inlineStr"><is><t>${escXml(val)}</t></is></c>`;
+    }).join('') + '</row>';
+  });
+  wsData += '</sheetData>';
+
+  const colWidth = labels.map(l => `<col min="1" max="1" width="${Math.max(l.length+2,12)}" bestFit="1"/>`).join('');
+
+  const ws = `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/sheet">
+  <cols>${colWidth}</cols>
+  ${wsData}
+</worksheet>`;
+
+  const wb = `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/sheet"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="${key}" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+
+  const rel = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`;
+
+  const ct = `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+
+  // Build ZIP manually using a simple method — base64 encode each part
+  // Since we can't use JSZip CDN reliably, fall back to CSV with .xls extension
+  // that Excel opens natively
+  const tsv = [labels.join('\t')]
+    .concat(items.map(item => cols.map(c => String(item[c]||'').replace(/\t/g,' ')).join('\t')))
+    .join('\n');
+  const blob = new Blob([tsv], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  triggerDownload(blob, `MHLab_${key}_${today()}.xls`);
+  closeMenu(key);
+}
+
+// ── PDF (browser print-to-PDF via styled window) ─────────────────
+function downloadPDF(key) {
+  const { items, cols, labels } = getExportData(key);
+  const tabLabel = getTabLabel(key);
+  const now = new Date().toLocaleString('en-GB', {day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  const rows = items.map(item =>
+    '<tr>' + cols.map(c => `<td>${escHtml(item[c]||'')}</td>`).join('') + '</tr>'
+  ).join('');
+
+  const headers = labels.map(l => `<th>${l}</th>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>MH Lab — ${tabLabel}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #1a1a2e; padding: 24px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid #2d6a4f; }
+  .lab-name { font-size: 16px; font-weight: 700; color: #2d6a4f; }
+  .lab-sub { font-size: 10px; color: #8888aa; margin-top: 2px; }
+  .report-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .meta { font-size: 10px; color: #8888aa; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #2d6a4f; color: white; padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e8e6df; font-size: 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f4f0; }
+  .footer { margin-top: 20px; font-size: 9px; color: #8888aa; text-align: center; border-top: 1px solid #e8e6df; padding-top: 10px; }
+  @media print { body { padding: 10px; } }
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="lab-name">MH Lab — Plant Stress Physiology & Biostimulant Research</div>
+    <div class="lab-sub">Sher-e-Bangla Agricultural University, Dhaka, Bangladesh</div>
+  </div>
+  <div style="text-align:right;">
+    <div class="report-title">${tabLabel} Inventory</div>
+    <div class="meta">Generated: ${now} · ${items.length} records</div>
+  </div>
+</div>
+<table>
+  <thead><tr>${headers}</tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">MH Lab Inventory System · Confidential · Generated by ${currentUser ? currentUser.name : 'Admin'}</div>
+<script>window.onload=()=>{window.print();}<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1100,height=750');
+  if (win) { win.document.write(html); win.document.close(); }
+  closeMenu(key);
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function colLetter(n) {
+  let s = '';
+  n++;
+  while (n > 0) { s = String.fromCharCode(64 + (n % 26 || 26)) + s; n = Math.floor((n-1)/26); }
+  return s;
+}
+function today() { return new Date().toISOString().slice(0,10); }
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function closeMenu(key) {
+  const m = document.getElementById('dl-menu-' + key);
+  if (m) m.classList.remove('open');
 }
 
 // ================================================================
