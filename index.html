@@ -2856,13 +2856,16 @@ function renderAdminUI(users) {
     </div>
 
     <!-- Admin credentials reminder -->
-    <div style="background:linear-gradient(135deg,#1e1b4b,#4338ca);border-radius:12px;padding:18px 22px;margin-bottom:20px;color:white;display:flex;align-items:center;gap:16px;">
+    <div style="background:linear-gradient(135deg,#1e1b4b,#4338ca);border-radius:12px;padding:18px 22px;margin-bottom:20px;color:white;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <i class="fas fa-key" style="font-size:24px;opacity:0.8;"></i>
-      <div>
+      <div style="flex:1;">
         <div style="font-weight:700;font-size:14px;margin-bottom:4px;">Your Admin Credentials</div>
         <div style="font-size:12px;opacity:0.8;">User ID: <code style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;">MHLAB_ADMIN_49706929</code>
         &nbsp; Password: <code style="background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:4px;">mn6UI6UJ83oXvaxh</code></div>
       </div>
+      <button onclick="reloadDefaultDataToFirestore()" style="padding:9px 18px;background:white;color:#1e1b4b;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;">
+        <i class="fas fa-cloud-arrow-up"></i> Reload 793 Books to Cloud
+      </button>
     </div>
 
     <!-- Permission guide -->
@@ -2923,6 +2926,22 @@ async function toggleBlock(uid, block) {
     );
     // onSnapshot will auto-refresh the UI
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function reloadDefaultDataToFirestore() {
+  if (!confirm('This will REPLACE all shared inventory data with the default data (including 793 books).\n\nAll current changes will be lost. Continue?')) return;
+  try {
+    const defaults = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    await fbDb.collection('labdata').doc('shared').set({ inventory: defaults });
+    localStorage.setItem('mhlab_data_shared', JSON.stringify(defaults));
+    _data = defaults;
+    alert('✅ Done! All 793 books and default inventory loaded for everyone.');
+    buildTabBar();
+    renderTab('books');
+    switchTab('books');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 async function removeUser(uid, email) {
