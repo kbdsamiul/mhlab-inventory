@@ -2621,11 +2621,11 @@ function renderTable(key, items) {
 
 function getHeaders(key) {
   const map = {
-    chemicals: [{key:'name',label:'Chemical Name'},{key:'formula',label:'Formula'},{key:'cas',label:'CAS No.'},{key:'amount',label:'Amount'},{key:'company',label:'Company'},{key:'location',label:'Location'},{key:'expiry',label:'Expiry'},{key:'url',label:'Reference URL (optional)',type:'url',full:true,placeholder:'https://www.sigmaaldrich.com/...'}],
-    equipment: [{key:'name',label:'Equipment'},{key:'model',label:'Model'},{key:'company',label:'Manufacturer'},{key:'category',label:'Category'},{key:'condition',label:'Condition'},{key:'battery',label:'Battery'},{key:'url',label:'Reference URL (optional)',type:'url',full:true,placeholder:'https://www.fishersci.com/...'}],
+    chemicals: [{key:'name',label:'Chemical Name'},{key:'formula',label:'Formula'},{key:'cas',label:'CAS No.'},{key:'amount',label:'Amount'},{key:'company',label:'Company'},{key:'location',label:'Location'},{key:'expiry',label:'Expiry'}],
+    equipment: [{key:'name',label:'Equipment'},{key:'model',label:'Model'},{key:'company',label:'Manufacturer'},{key:'category',label:'Category'},{key:'condition',label:'Condition'},{key:'battery',label:'Battery'}],
     seeds: [{key:'name',label:'Name'},{key:'sciName',label:'Scientific Name'},{key:'variety',label:'Variety'},{key:'category',label:'Category'},{key:'weight',label:'Weight (g)'},{key:'packetNo',label:'Packets'},{key:'expiry',label:'Expiry'}],
     glassware: [{key:'name',label:'Item Name'},{key:'volume',label:'Volume'},{key:'quantity',label:'Qty'},{key:'location',label:'Location'}],
-    books: [{key:'name',label:'Book Title'},{key:'author',label:'Author'},{key:'publisher',label:'Publisher'},{key:'year',label:'Year'},{key:'edition',label:'Edition'},{key:'quantity',label:'Copy'},{key:'category',label:'Shelf & Row'},{key:'url',label:'Book URL / DOI (optional)',type:'url',full:true,placeholder:'https://doi.org/... or https://books.google.com/...'}],
+    books: [{key:'name',label:'Book Title'},{key:'author',label:'Author'},{key:'publisher',label:'Publisher'},{key:'year',label:'Year'},{key:'edition',label:'Edition'},{key:'quantity',label:'Copy'},{key:'category',label:'Shelf & Row'}],
     students: [{key:'name',label:'Name'},{key:'degree',label:'Degree'},{key:'regNo',label:'Reg. No.'},{key:'phone',label:'Phone'},{key:'email',label:'Email'},{key:'hall',label:'Hall'},{key:'department',label:'Dept.'},{key:'status',label:'Status'}]
   };
   return map[key] || [];
@@ -2635,7 +2635,7 @@ function renderRow(key, item) {
   let cells = '';
   if (key === 'chemicals') {
     cells = `
-      <td><span class="item-link" onclick="${item.url ? `window.open('${item.url.replace(/'/g,"\\'")}','_blank')` : `openDetailModal('chemicals',${item.id})`}" title="${item.url ? 'Open Reference Page' : 'View Details'}">${escHtml(item.name)}</span>${item.url ? '<i class="fas fa-external-link-alt" style="font-size:9px;color:var(--text3);margin-left:4px;"></i>' : ''}${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
+      <td><span class="item-link" onclick="openDetailModal('chemicals',${item.id})" title="View Details">${escHtml(item.name)}</span>${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
       <td class="mono">${escHtml(item.formula)}</td>
       <td class="mono">${escHtml(item.cas)}</td>
       <td>${escHtml(item.amount)}</td>
@@ -2644,7 +2644,7 @@ function renderRow(key, item) {
       <td>${expiryBadge(item.expiry)}${item.expiry?`<div class="mono" style="font-size:10px;margin-top:2px;">${item.expiry}</div>`:''}</td>`;
   } else if (key === 'equipment') {
     cells = `
-      <td><span class="item-link" onclick="${item.url ? `window.open('${item.url.replace(/'/g,"\\'")}','_blank')` : `openDetailModal('equipment',${item.id})`}" title="${item.url ? 'Open Reference Page' : 'View Details'}">${escHtml(item.name)}</span>${item.url ? '<i class="fas fa-external-link-alt" style="font-size:9px;color:var(--text3);margin-left:4px;"></i>' : ''}</td>
+      <td><span class="item-link" onclick="openDetailModal('equipment',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
       <td class="mono">${escHtml(item.model)}</td>
       <td>${escHtml(item.company)}</td>
       <td><span class="badge badge-blue">${escHtml(item.category)}</span></td>
@@ -2667,7 +2667,7 @@ function renderRow(key, item) {
       <td>${escHtml(item.location)}</td>`;
   } else if (key === 'books') {
     cells = `
-      <td><span class="item-link" onclick="${item.url ? `window.open('${item.url.replace(/'/g,"\\'")}','_blank')` : `openDetailModal('books',${item.id})`}" title="${item.url ? 'Open Reference Page' : 'View Details'}">${escHtml(item.name)}</span>${item.url ? '<i class="fas fa-external-link-alt" style="font-size:9px;color:var(--text3);margin-left:4px;"></i>' : ''}</td>
+      <td><span class="item-link" onclick="openDetailModal('books',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
       <td style="font-size:12px;">${escHtml(item.author||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.publisher||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.year||'—')}</td>
@@ -2783,6 +2783,7 @@ function getFields(key) {
       {key:'shelf',label:'Shelf No.',type:'text'},
       {key:'row',label:'Row No.',type:'text'},
       {key:'category',label:'Shelf & Row (e.g. Shelf-1, Row-2)',type:'text',full:true}
+    
     ],
     students: [
       {key:'name',label:'Full Name',type:'text',required:true},
