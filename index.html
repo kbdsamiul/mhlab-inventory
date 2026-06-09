@@ -2416,20 +2416,21 @@ let _currentFirebaseUser = null;
 
 function escHtml(str) {
   if (!str && str !== 0) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function itemNameCell(item, key) {
-  var name = escHtml(item.name || '');
-  var url = (item.url || '').trim();
+  var name = String(item.name || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  var url = String(item.url || '').trim();
   if (url) {
-    return '<a href="' + escHtml(url) + '" target="_blank" rel="noopener" '
+    var safeUrl = url.replace(/"/g,'&quot;');
+    return '<a href="' + safeUrl + '" target="_blank" rel="noopener" '
       + 'style="font-weight:700;color:var(--accent);text-decoration:none;'
-      + 'border-bottom:1.5px dashed var(--accent2);display:inline-flex;align-items:center;gap:5px;" '
+      + 'border-bottom:1.5px dashed var(--accent2);" '
       + 'title="Open link">' + name
-      + ' <i class="fas fa-arrow-up-right-from-square" style="font-size:9px;opacity:0.6;"></i></a>';
+      + ' <i class="fas fa-arrow-up-right-from-square" style="font-size:9px;opacity:0.7;"></i></a>';
   }
-  return '<span class="item-link" onclick="openDetailModal('' + key + '',' + item.id + ')" title="View Details">' + name + '</span>';
+  return '<span class="item-link" onclick="openDetailModal(&quot;' + key + '&quot;,' + item.id + ')" title="View Details">' + name + '</span>';
 }
 // ===== APP STATE =====
 let currentTab = 'chemicals';
