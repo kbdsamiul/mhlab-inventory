@@ -2667,7 +2667,7 @@ function renderRow(key, item) {
       <td>${escHtml(item.location)}</td>`;
   } else if (key === 'books') {
     cells = `
-      <td><span class="item-link" onclick="openDetailModal('books',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
+      <td>${itemNameCell(item,'books')}</td>
       <td style="font-size:12px;">${escHtml(item.author||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.publisher||'—')}</td>
       <td style="font-size:12px;">${escHtml(item.year||'—')}</td>
@@ -2785,8 +2785,8 @@ function getFields(key) {
       {key:'quantity',label:'No. of Copies',type:'number'},
       {key:'shelf',label:'Shelf No.',type:'text'},
       {key:'row',label:'Row No.',type:'text'},
-      {key:'category',label:'Shelf & Row (e.g. Shelf-1, Row-2)',type:'text',full:true}
-    
+      {key:'category',label:'Shelf & Row (e.g. Shelf-1, Row-2)',type:'text',full:true},
+      {key:'url',label:'Book URL / DOI Link',type:'text',full:true,placeholder:'https://doi.org/...  or  https://books.google.com/...  (optional)'}
     ],
     students: [
       {key:'name',label:'Full Name',type:'text',required:true},
