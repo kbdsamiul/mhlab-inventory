@@ -2635,7 +2635,7 @@ function renderRow(key, item) {
   let cells = '';
   if (key === 'chemicals') {
     cells = `
-      <td><span class="item-link" onclick="openDetailModal('chemicals',${item.id})" title="View Details">${escHtml(item.name)}</span>${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
+      <td>${item.url ? `<a href="${item.url}" target="_blank" rel="noopener" style="font-weight:700;color:var(--accent);text-decoration:none;border-bottom:1.5px dashed var(--accent2);" title="Open: ${escHtml(item.url)}">${escHtml(item.name)} <i class='fas fa-arrow-up-right-from-square' style='font-size:9px;opacity:0.6;'></i></a>` : `<span class="item-link" onclick="openDetailModal('chemicals',${item.id})" title="View Details">${escHtml(item.name)}</span>`}${item.purity?`<div style="font-size:11px;color:var(--text3)">Purity: ${escHtml(item.purity)}</div>`:''}</td>
       <td class="mono">${escHtml(item.formula)}</td>
       <td class="mono">${escHtml(item.cas)}</td>
       <td>${escHtml(item.amount)}</td>
@@ -2644,7 +2644,7 @@ function renderRow(key, item) {
       <td>${expiryBadge(item.expiry)}${item.expiry?`<div class="mono" style="font-size:10px;margin-top:2px;">${item.expiry}</div>`:''}</td>`;
   } else if (key === 'equipment') {
     cells = `
-      <td><span class="item-link" onclick="openDetailModal('equipment',${item.id})" title="View Details">${escHtml(item.name)}</span></td>
+      <td>${item.url ? `<a href="${item.url}" target="_blank" rel="noopener" style="font-weight:700;color:var(--accent);text-decoration:none;border-bottom:1.5px dashed var(--accent2);" title="Open: ${escHtml(item.url)}">${escHtml(item.name)} <i class='fas fa-arrow-up-right-from-square' style='font-size:9px;opacity:0.6;'></i></a>` : `<span class="item-link" onclick="openDetailModal('equipment',${item.id})" title="View Details">${escHtml(item.name)}</span>`}</td>
       <td class="mono">${escHtml(item.model)}</td>
       <td>${escHtml(item.company)}</td>
       <td><span class="badge badge-blue">${escHtml(item.category)}</span></td>
@@ -2748,7 +2748,8 @@ function getFields(key) {
       {key:'company',label:'Company',type:'text'},
       {key:'purity',label:'Purity / %',type:'text'},
       {key:'location',label:'Location',type:'select',options:['Almira','Refrigerator (Normal)','Refrigerator (-20°C)','Cupboard (Lab)']},
-      {key:'expiry',label:'Expiry Date',type:'date'}
+      {key:'expiry',label:'Expiry Date',type:'date'},
+      {key:'url',label:'Reference URL',type:'text',full:true,placeholder:'https://www.sigmaaldrich.com/...  (optional)'}
     ],
     equipment: [
       {key:'name',label:'Equipment Name',type:'text',required:true,full:true},
@@ -2756,7 +2757,8 @@ function getFields(key) {
       {key:'company',label:'Manufacturer',type:'text'},
       {key:'category',label:'Category',type:'select',options:['Balance','Optical','Mixing','Measurement','Plant Physiology','Soil','Liquid Handling','Heating','Incubation','Storage','Safety','Separation','Water','Other']},
       {key:'condition',label:'Condition',type:'select',options:['Good','New','Bad','Problem','Need to check']},
-      {key:'battery',label:'Battery Type',type:'text'}
+      {key:'battery',label:'Battery Type',type:'text'},
+      {key:'url',label:'Reference URL',type:'text',full:true,placeholder:'https://www.fishersci.com/...  (optional)'}
     ],
     seeds: [
       {key:'name',label:'Common Name',type:'text',required:true},
@@ -2765,7 +2767,8 @@ function getFields(key) {
       {key:'category',label:'Category',type:'select',options:['Cereals','Oilseeds','Fodders','Pulses','Weeds','Fibres','Vegetables','Herbs','Flowers','Others']},
       {key:'weight',label:'Weight (g)',type:'text'},
       {key:'packetNo',label:'Packet No.',type:'text'},
-      {key:'expiry',label:'Expiry Date',type:'date'}
+      {key:'expiry',label:'Expiry Date',type:'date'},
+      {key:'url',label:'Reference URL',type:'text',full:true,placeholder:'https://...  (optional)'}
     ],
     glassware: [
       {key:'name',label:'Item Name',type:'text',required:true},
