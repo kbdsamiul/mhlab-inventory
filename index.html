@@ -2644,7 +2644,7 @@ function renderRow(key, item) {
       <td>${expiryBadge(item.expiry)}${item.expiry?`<div class="mono" style="font-size:10px;margin-top:2px;">${item.expiry}</div>`:''}</td>`;
   } else if (key === 'equipment') {
     cells = `
-      <td>${item.url ? `<a href="${item.url}" target="_blank" rel="noopener" style="font-weight:700;color:var(--accent);text-decoration:none;border-bottom:1.5px dashed var(--accent2);" title="Open: ${escHtml(item.url)}">${escHtml(item.name)} <i class='fas fa-arrow-up-right-from-square' style='font-size:9px;opacity:0.6;'></i></a>` : `<span class="item-link" onclick="openDetailModal('equipment',${item.id})" title="View Details">${escHtml(item.name)}</span>`}</td>
+      <td>${itemNameCell(item,'equipment')}</td>
       <td class="mono">${escHtml(item.model)}</td>
       <td>${escHtml(item.company)}</td>
       <td><span class="badge badge-blue">${escHtml(item.category)}</span></td>
@@ -2652,7 +2652,7 @@ function renderRow(key, item) {
       <td class="mono">${escHtml(item.battery)||'—'}</td>`;
   } else if (key === 'seeds') {
     cells = `
-      <td><strong>${escHtml(item.name)}</strong></td>
+      <td>${itemNameCell(item,'seeds')}</td>
       <td class="sci-name">${escHtml(item.sciName)}</td>
       <td>${escHtml(item.variety)||'—'}</td>
       <td><span class="badge badge-blue">${escHtml(item.category)}</span></td>
