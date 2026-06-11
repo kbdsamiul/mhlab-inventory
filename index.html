@@ -1156,15 +1156,38 @@ function getData() {
 }
 
 let _hasUnsaved = false;
+let _saveTimer = null;
 
 function saveData(data) {
   _data = data;
-  // Save locally for instant reads
+  // Save locally immediately for instant reads
   if (currentUser) localStorage.setItem('mhlab_data_shared', JSON.stringify(data));
-  // Show unsaved bar instead of auto-saving to Firestore
+  // Auto-save to Firestore after 1 second debounce (no manual button needed)
   _hasUnsaved = true;
   const bar = document.getElementById('unsaved-bar');
   if (bar) bar.style.display = 'flex';
+  // Debounced auto-save
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    try {
+      await _saveRemote(data);
+      _hasUnsaved = false;
+      const bar = document.getElementById('unsaved-bar');
+      if (bar) {
+        bar.style.background = 'linear-gradient(135deg,#065f46,#059669)';
+        bar.querySelector('span').innerHTML = '<i class="fas fa-circle-check" style="margin-right:6px;"></i> Saved!';
+        const btnDiv = bar.querySelector('div');
+        if (btnDiv) btnDiv.style.display = 'none';
+        setTimeout(() => {
+          bar.style.display = 'none';
+          bar.style.background = 'linear-gradient(135deg,#92400e,#d97706)';
+          if (btnDiv) btnDiv.style.display = 'flex';
+        }, 2000);
+      }
+    } catch(e) {
+      console.warn('Auto-save failed:', e.message);
+    }
+  }, 1000);
 }
 
 async function saveAllChanges() {
