@@ -2914,10 +2914,32 @@ function saveModalItem() {
     newItem.id = getNextId(arr);
     arr.push(newItem);
   }
-  saveData(data);
+  // Save locally first for instant UI update
+  _data = data;
+  if (currentUser) localStorage.setItem('mhlab_data_shared', JSON.stringify(data));
+  // Save to Firestore immediately (await so it actually completes)
+  _saveRemote(data).then(() => {
+    console.log('Saved to Firestore successfully');
+  }).catch(e => {
+    console.error('Firestore save failed:', e);
+  });
   closeModal();
   buildTabBar();
   renderTab(currentTab);
+  // Show brief confirmation
+  const bar = document.getElementById('unsaved-bar');
+  if (bar) {
+    bar.style.display = 'flex';
+    bar.style.background = 'linear-gradient(135deg,#065f46,#059669)';
+    bar.querySelector('span').innerHTML = '<i class="fas fa-circle-check" style="margin-right:6px;"></i> Saved!';
+    const btnDiv = bar.querySelector('div');
+    if (btnDiv) btnDiv.style.display = 'none';
+    setTimeout(() => {
+      bar.style.display = 'none';
+      bar.style.background = 'linear-gradient(135deg,#92400e,#d97706)';
+      if (btnDiv) btnDiv.style.display = 'flex';
+    }, 2000);
+  }
 }
 
 // ===== DELETE =====
