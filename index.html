@@ -1113,8 +1113,19 @@ async function _saveRemote(data) {
     };
     await fbDb.collection('labdata').doc('shared').set({ inventory: data, meta });
     updateFooterDisplay(meta);
+    return true;
   } catch(e) {
-    console.warn('Firestore save failed:', e.message);
+    console.error('Firestore save FAILED:', e.code, e.message);
+    // Show visible error to user
+    const bar = document.getElementById('unsaved-bar');
+    if (bar) {
+      bar.style.display = 'flex';
+      bar.style.background = 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+      bar.querySelector('span').innerHTML = '<i class="fas fa-circle-exclamation" style="margin-right:6px;"></i> Save failed: ' + e.message + ' — click "Save for Everyone" to retry';
+      const btnDiv = bar.querySelector('div');
+      if (btnDiv) btnDiv.style.display = 'flex';
+    }
+    return false;
   }
 }
 
@@ -1193,21 +1204,23 @@ function saveData(data) {
 async function saveAllChanges() {
   const btn = document.getElementById('save-all-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...'; }
-  try {
-    await _saveRemote(_data);
+  const ok = await _saveRemote(_data);
+  if (ok) {
     _hasUnsaved = false;
     const bar = document.getElementById('unsaved-bar');
     if (bar) {
       bar.style.background = 'linear-gradient(135deg,#065f46,#059669)';
       bar.querySelector('span').innerHTML = '<i class="fas fa-circle-check" style="margin-right:6px;"></i> Saved for all users!';
-      bar.querySelector('div').style.display = 'none';
-      setTimeout(() => { bar.style.display = 'none'; bar.style.background = 'linear-gradient(135deg,#92400e,#d97706)'; }, 2500);
+      const btnDiv = bar.querySelector('div');
+      if (btnDiv) btnDiv.style.display = 'none';
+      setTimeout(() => {
+        bar.style.display = 'none';
+        bar.style.background = 'linear-gradient(135deg,#92400e,#d97706)';
+        if (btnDiv) btnDiv.style.display = 'flex';
+      }, 2500);
     }
-  } catch(e) {
-    alert('Save failed: ' + e.message + '\nPlease try again.');
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Save for Everyone'; }
   }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Save for Everyone'; }
 }
 
 function discardChanges() {
