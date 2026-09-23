@@ -60,8 +60,56 @@
   --mono: 'DM Mono', monospace;
 }
 
+/* ── DARK MODE ──────────────────────────────────── */
+[data-theme="dark"] {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #16213e;
+  --border: #2a2a4a;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --accent-light: #1e1b4b;
+  --green-light: #052e16;
+  --red-light: #1a0a0a;
+  --yellow-light: #1a1200;
+  --orange-light: #1a0d00;
+  --pink-light: #1a0a12;
+  --teal-light: #0a1a1f;
+  --purple-light: #1a0d2e;
+  --shadow: 0 1px 4px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.6);
+}
+[data-theme="dark"] .auth-card { background: rgba(26,26,46,0.98); }
+[data-theme="dark"] .table-wrap { background: var(--surface); }
+[data-theme="dark"] thead tr { background: linear-gradient(135deg,#1e1b4b,#2d1b69); }
+[data-theme="dark"] th { color: #a5b4fc; }
+[data-theme="dark"] td { border-bottom-color: #1e1e3a; }
+[data-theme="dark"] tr:hover td { background: #1a1a2e; }
+[data-theme="dark"] .stat-card { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .chart-card { background: var(--surface); }
+[data-theme="dark"] .modal { background: var(--surface); }
+[data-theme="dark"] .modal-header { background: linear-gradient(135deg,#1e1b4b,#1a1a2e); }
+[data-theme="dark"] .modal-footer { background: #0f0f1a; }
+[data-theme="dark"] .field-group input,
+[data-theme="dark"] .field-group select,
+[data-theme="dark"] .field-group textarea { background: #0f0f1a; border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .search-input { background: #1a1a2e; border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .filter-select { background: #1a1a2e; border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .tab-bar { background: #1a1a2e; border-bottom-color: var(--border); }
+[data-theme="dark"] .tab-btn { color: var(--text3); }
+[data-theme="dark"] .page-btn { background: #1a1a2e; border-color: var(--border); color: var(--text2); }
+[data-theme="dark"] footer { background: #1a1a2e; border-top-color: var(--border); }
+[data-theme="dark"] .table-info { background: linear-gradient(135deg,#1a1a2e,#1e1b4b); color: var(--text2); }
+[data-theme="dark"] .btn-secondary { background: #1a1a2e; border-color: var(--border); color: var(--text2); }
+[data-theme="dark"] .btn-reset { background: #1a1a2e; border-color: var(--border); color: var(--text2); }
+[data-theme="dark"] .download-menu { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .download-item:hover { background: #0f0f1a; color: var(--text); }
+[data-theme="dark"] .download-item { color: var(--text); }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; transition: background .3s, color .3s; }
 
 /* ── AUTH ─────────────────────────────────────────── */
 #auth-screen {
@@ -696,6 +744,13 @@ tr:hover td { background: linear-gradient(135deg, #f8faff, #f5f3ff); }
       </div>
     </div>
     <div class="header-right">
+      <button id="dark-toggle" onclick="toggleDarkMode()" title="Toggle dark mode" style="
+        width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.25);
+        background:rgba(255,255,255,0.1);color:white;cursor:pointer;font-size:15px;
+        display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);
+        transition:all .2s;flex-shrink:0;">
+        <i class="fas fa-moon" id="dark-icon"></i>
+      </button>
       <div class="user-badge"><i class="fas fa-circle-user"></i> <span id="user-name-display">Admin</span> <span id="role-badge-display"></span></div>
       <button class="btn-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
@@ -2496,8 +2551,10 @@ const TABS = [
   {key:'glassware', label:'Glassware', icon:'fa-wine-bottle',color:'#7c3aed'},
   {key:'books',     label:'Books',     icon:'fa-book',       color:'#d97706'},
   {key:'students',  label:'Students',  icon:'fa-users',      color:'#db2777'},
-  {key:'analytics', label:'Analytics', icon:'fa-chart-bar',  color:'#ea580c'},
-  {key:'admin',     label:'Admin',     icon:'fa-shield-halved', color:'#dc2626'}
+  {key:'analytics',    label:'Analytics',   icon:'fa-chart-bar',    color:'#ea580c'},
+  {key:'publications', label:'Papers',       icon:'fa-file-lines',   color:'#0891b2'},
+  {key:'activity',     label:'Activity Log', icon:'fa-clock-rotate-left', color:'#7c3aed'},
+  {key:'admin',        label:'Admin',        icon:'fa-shield-halved', color:'#dc2626'}
 ];
 
 function buildTabBar() {
@@ -2511,7 +2568,11 @@ function buildTabBar() {
     students: data.students.length
   };
   const bar = document.getElementById('tab-bar');
-  bar.innerHTML = TABS.filter(t => t.key !== 'admin' || (currentUser && currentUser.role === 'admin')).map(t => `
+  bar.innerHTML = TABS.filter(t => {
+    if (t.key === 'admin') return currentUser && currentUser.role === 'admin';
+    if (t.key === 'activity') return currentUser && (currentUser.role === 'admin' || currentUser.role === 'editor');
+    return true;
+  }).map(t => `
     <button class="tab-btn${t.key===currentTab?' active':''}" onclick="switchTab('${t.key}')"
       style="${t.key===currentTab ? `color:${t.color};border-bottom-color:${t.color};` : ''}">
       <i class="fas ${t.icon}" style="color:${t.color};opacity:${t.key===currentTab?'1':'0.6'};"></i>
@@ -2540,8 +2601,10 @@ function launchApp(user) {
 // ===== RENDER TAB =====
 function renderTab(key) {
   const main = document.getElementById('main-content');
-  if (key === 'analytics') { renderAnalytics(); return; }
-  if (key === 'admin') { renderAdminPanel(); return; }
+  if (key === 'analytics')    { renderAnalytics(); return; }
+  if (key === 'publications') { renderPublications(); return; }
+  if (key === 'activity')     { renderActivityLog(); return; }
+  if (key === 'admin')        { renderAdminPanel(); return; }
   
   const data = getData();
   let items = [...(data[key] || [])];
@@ -3334,7 +3397,13 @@ function openDetailModal(key, id) {
         <a class="search-link-btn" href="${escHtml(item.url)}" target="_blank" rel="noopener">
           <i class="fas fa-external-link-alt"></i> Open Reference Page
         </a>
-      </div>` : ''}`;
+      </div>` : ''}
+      <div class="detail-divider"><i class="fas fa-shield-halved"></i> Chemical Safety</div>
+      <div id="safety-info-box" style="display:none;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:4px;"></div>
+      <button onclick="fetchSafetyInfo('${escHtml(item.cas||'')}','${escHtml(item.name||'')}')"
+        class="search-link-btn" style="margin-top:8px;">
+        <i class="fas fa-shield-halved"></i> Fetch Safety Info (PubChem)
+      </button>`;
     document.getElementById('modal-title').innerHTML = `<i class="fas fa-flask" style="color:var(--accent);margin-right:8px;"></i> Chemical Details`;
   }
 
@@ -3376,7 +3445,13 @@ function openDetailModal(key, id) {
         <a class="search-link-btn" href="${escHtml(item.url)}" target="_blank" rel="noopener">
           <i class="fas fa-external-link-alt"></i> Open Reference Page
         </a>
-      </div>` : ''}`;
+      </div>` : ''}
+      <div class="detail-divider"><i class="fas fa-shield-halved"></i> Chemical Safety</div>
+      <div id="safety-info-box" style="display:none;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:4px;"></div>
+      <button onclick="fetchSafetyInfo('${escHtml(item.cas||'')}','${escHtml(item.name||'')}')"
+        class="search-link-btn" style="margin-top:8px;">
+        <i class="fas fa-shield-halved"></i> Fetch Safety Info (PubChem)
+      </button>`;
     document.getElementById('modal-title').innerHTML = `<i class="fas fa-microscope" style="color:var(--teal);margin-right:8px;"></i> Equipment Details`;
   }
 
@@ -3634,12 +3709,328 @@ function closeMenu(key) {
   if (m) m.classList.remove('open');
 }
 
+
+// ================================================================
+// DARK MODE
+// ================================================================
+function toggleDarkMode() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('mhlab_theme', newTheme);
+  document.getElementById('dark-icon').className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+}
+
+function initDarkMode() {
+  const saved = localStorage.getItem('mhlab_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const icon = document.getElementById('dark-icon');
+  if (icon) icon.className = saved === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+}
+
+// ================================================================
+// ACTIVITY LOG
+// ================================================================
+async function logActivity(action, tab, itemName, details) {
+  if (!currentUser) return;
+  try {
+    const entry = {
+      action,      // 'ADD' | 'EDIT' | 'DELETE'
+      tab,
+      itemName,
+      details: details || '',
+      user: currentUser.name,
+      email: currentUser.email,
+      role: currentUser.role,
+      timestamp: new Date().toISOString()
+    };
+    await fbDb.collection('activitylog').add(entry);
+  } catch(e) { console.warn('Activity log failed:', e.message); }
+}
+
+async function renderActivityLog() {
+  if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'editor')) {
+    document.getElementById('main-content').innerHTML =
+      '<div class="empty-state"><i class="fas fa-lock"></i><p>Access denied.</p></div>';
+    return;
+  }
+  const mc = document.getElementById('main-content');
+  mc.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:20px;"><i class="fas fa-circle-notch fa-spin" style="color:var(--accent);"></i><span style="color:var(--text2);">Loading activity log...</span></div>';
+
+  try {
+    const snap = await fbDb.collection('activitylog').orderBy('timestamp','desc').limit(200).get();
+    const logs = [];
+    snap.forEach(doc => logs.push({id: doc.id, ...doc.data()}));
+
+    const actionColor = {ADD:'#059669', EDIT:'#d97706', DELETE:'#dc2626'};
+    const actionIcon  = {ADD:'fa-plus-circle', EDIT:'fa-pen-circle', DELETE:'fa-trash-circle'};
+    const tabIcon     = {chemicals:'fa-flask',equipment:'fa-microscope',seeds:'fa-seedling',glassware:'fa-wine-bottle',books:'fa-book',students:'fa-users'};
+
+    const rows = logs.map(l => {
+      const dt = new Date(l.timestamp);
+      const date = dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+      const time = dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      const color = actionColor[l.action] || '#6b7280';
+      return `<tr>
+        <td style="font-size:12px;color:var(--text3);white-space:nowrap;">${date}<br>${time}</td>
+        <td><span style="background:${color}22;color:${color};font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">
+          <i class="fas ${actionIcon[l.action]||'fa-circle'}" style="margin-right:4px;"></i>${l.action}</span></td>
+        <td><i class="fas ${tabIcon[l.tab]||'fa-box'}" style="color:var(--accent);margin-right:6px;"></i>${escHtml(l.tab||'')}</td>
+        <td style="font-weight:600;">${escHtml(l.itemName||'')}</td>
+        <td style="font-size:12px;color:var(--text2);">${escHtml(l.details||'')}</td>
+        <td><span style="font-size:11px;font-weight:600;color:var(--accent);">${escHtml(l.user||'')}</span>
+          <div style="font-size:10px;color:var(--text3);">${escHtml(l.role||'')}</div></td>
+      </tr>`;
+    }).join('');
+
+    mc.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px;">Activity Log</h2>
+          <p style="font-size:12px;color:var(--text3);">${logs.length} recent actions recorded</p>
+        </div>
+        <button onclick="renderActivityLog()" style="padding:8px 16px;background:var(--accent-light);color:var(--accent);border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);">
+          <i class="fas fa-refresh"></i> Refresh
+        </button>
+      </div>
+      ${logs.length === 0 ? '<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><p>No activity recorded yet.<br>Actions will appear here as you add, edit, or delete items.</p></div>' : `
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>Date / Time</th><th>Action</th><th>Section</th><th>Item</th><th>Details</th><th>By</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`}`;
+  } catch(e) {
+    mc.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Failed to load: ${e.message}</p></div>`;
+  }
+}
+
+// ================================================================
+// PUBLICATIONS TRACKER
+// ================================================================
+function renderPublications() {
+  const mc = document.getElementById('main-content');
+  const pubs = getData().publications || [];
+  const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'editor');
+
+  const cards = pubs.map(p => `
+    <div class="stat-card" style="padding:20px;border-left:4px solid var(--teal);">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4;">
+            ${p.doi ? `<a href="${escHtml(p.doi)}" target="_blank" style="color:var(--accent);text-decoration:none;">${escHtml(p.title)}</a>` : escHtml(p.title)}
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">${escHtml(p.authors||'')}</div>
+          <div style="font-size:11px;color:var(--text3);">
+            <i class="fas fa-journal-whills" style="margin-right:4px;color:var(--teal);"></i>${escHtml(p.journal||'')}
+            ${p.year ? ` · ${escHtml(p.year)}` : ''}
+            ${p.volume ? ` · Vol. ${escHtml(p.volume)}` : ''}
+          </div>
+        </div>
+        ${canEdit ? `<div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn-icon edit" onclick="openPubModal(${p.id})" title="Edit"><i class="fas fa-pen"></i></button>
+          <button class="btn-icon delete" onclick="deletePub(${p.id})" title="Delete"><i class="fas fa-trash"></i></button>
+        </div>` : ''}
+      </div>
+      ${(p.chemicals||p.equipment||p.seeds) ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <span style="font-size:10px;color:var(--text3);font-weight:600;margin-right:4px;">LINKED:</span>
+        ${(p.chemicals||'').split(',').filter(x=>x.trim()).map(x=>`<span class="badge badge-blue" style="font-size:10px;">${escHtml(x.trim())}</span>`).join('')}
+        ${(p.equipment||'').split(',').filter(x=>x.trim()).map(x=>`<span class="badge" style="background:var(--teal-light);color:var(--teal);font-size:10px;">${escHtml(x.trim())}</span>`).join('')}
+      </div>` : ''}
+    </div>`).join('');
+
+  mc.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px;">Publications</h2>
+        <p style="font-size:12px;color:var(--text3);">${pubs.length} paper${pubs.length!==1?'s':''} linked to lab inventory</p>
+      </div>
+      ${canEdit ? `<button class="btn-add" onclick="openPubModal(null)" style="background:linear-gradient(135deg,var(--teal),var(--accent));">
+        <i class="fas fa-plus"></i> Add Paper
+      </button>` : ''}
+    </div>
+    ${pubs.length === 0 ?
+      '<div class="empty-state"><i class="fas fa-file-lines"></i><p>No publications added yet.<br>Link your papers to chemicals and equipment used.</p></div>' :
+      `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;">${cards}</div>`
+    }`;
+}
+
+function openPubModal(id) {
+  const data = getData();
+  if (!data.publications) data.publications = [];
+  const pub = id ? data.publications.find(p => p.id === id) : null;
+  const chemNames = (data.chemicals||[]).map(c=>c.name).slice(0,30);
+  const eqNames   = (data.equipment||[]).map(e=>e.name).slice(0,20);
+
+  document.getElementById('modal-title').innerHTML = `<i class="fas fa-file-lines" style="color:var(--teal);margin-right:8px;"></i>${pub ? 'Edit Paper' : 'Add Publication'}`;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-grid">
+      <div class="field-group full"><label>Paper Title*</label>
+        <input type="text" id="pub-title" value="${escHtml(pub?.title||'')}" placeholder="Full paper title"></div>
+      <div class="field-group full"><label>Authors</label>
+        <input type="text" id="pub-authors" value="${escHtml(pub?.authors||'')}" placeholder="Author1, Author2, Author3..."></div>
+      <div class="field-group"><label>Journal</label>
+        <input type="text" id="pub-journal" value="${escHtml(pub?.journal||'')}" placeholder="Journal name"></div>
+      <div class="field-group"><label>Year</label>
+        <input type="text" id="pub-year" value="${escHtml(pub?.year||'')}" placeholder="2024"></div>
+      <div class="field-group"><label>Volume / Issue</label>
+        <input type="text" id="pub-volume" value="${escHtml(pub?.volume||'')}" placeholder="Vol. 15, Issue 3"></div>
+      <div class="field-group"><label>DOI / URL</label>
+        <input type="text" id="pub-doi" value="${escHtml(pub?.doi||'')}" placeholder="https://doi.org/..."></div>
+      <div class="field-group full"><label>Chemicals Used <span style="font-weight:400;color:var(--text3)">(comma-separated names)</span></label>
+        <input type="text" id="pub-chemicals" value="${escHtml(pub?.chemicals||'')}" placeholder="e.g. NaCl, Cadmium Chloride"></div>
+      <div class="field-group full"><label>Equipment Used <span style="font-weight:400;color:var(--text3)">(comma-separated names)</span></label>
+        <input type="text" id="pub-equipment" value="${escHtml(pub?.equipment||'')}" placeholder="e.g. Spectrophotometer, pH Meter"></div>
+      <div class="field-group full"><label>Notes</label>
+        <textarea id="pub-notes" rows="2" placeholder="Any additional notes...">${escHtml(pub?.notes||'')}</textarea></div>
+    </div>`;
+
+  document.getElementById('modal-save-btn').textContent = pub ? 'Update' : 'Add Paper';
+  document.getElementById('modal-save-btn').onclick = () => savePub(id);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function savePub(id) {
+  const title = document.getElementById('pub-title').value.trim();
+  if (!title) { document.getElementById('pub-title').style.borderColor='var(--red)'; return; }
+  const pub = {
+    id: id || Date.now(),
+    title,
+    authors:   document.getElementById('pub-authors').value.trim(),
+    journal:   document.getElementById('pub-journal').value.trim(),
+    year:      document.getElementById('pub-year').value.trim(),
+    volume:    document.getElementById('pub-volume').value.trim(),
+    doi:       document.getElementById('pub-doi').value.trim(),
+    chemicals: document.getElementById('pub-chemicals').value.trim(),
+    equipment: document.getElementById('pub-equipment').value.trim(),
+    notes:     document.getElementById('pub-notes').value.trim(),
+  };
+  const data = getData();
+  if (!data.publications) data.publications = [];
+  if (id) {
+    const idx = data.publications.findIndex(p => p.id === id);
+    if (idx !== -1) data.publications[idx] = pub;
+  } else {
+    data.publications.push(pub);
+    logActivity('ADD', 'publications', title, pub.journal);
+  }
+  _data = data;
+  localStorage.setItem('mhlab_data_shared', JSON.stringify(data));
+  _saveRemote(data);
+  closeModal();
+  renderPublications();
+}
+
+function deletePub(id) {
+  if (!confirm('Delete this publication?')) return;
+  const data = getData();
+  const pub = (data.publications||[]).find(p=>p.id===id);
+  data.publications = (data.publications||[]).filter(p => p.id !== id);
+  logActivity('DELETE', 'publications', pub?.title||'', '');
+  _data = data;
+  localStorage.setItem('mhlab_data_shared', JSON.stringify(data));
+  _saveRemote(data);
+  renderPublications();
+}
+
+// ================================================================
+// CHEMICAL SAFETY INFO (via PubChem API)
+// ================================================================
+async function fetchSafetyInfo(casNumber, chemName) {
+  const mc = document.getElementById('safety-info-box');
+  if (!mc) return;
+  mc.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="color:var(--accent);"></i> Fetching safety data...';
+  mc.style.display = 'block';
+
+  try {
+    // PubChem CID lookup by CAS or name
+    const query = casNumber && casNumber.trim() ? casNumber.trim() : chemName;
+    const cidRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(query)}/cids/JSON`);
+    if (!cidRes.ok) throw new Error('Chemical not found in PubChem');
+    const cidData = await cidRes.json();
+    const cid = cidData.IdentifierList?.CID?.[0];
+    if (!cid) throw new Error('No PubChem entry found');
+
+    // Fetch GHS hazard data
+    const propRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/${cid}/JSON?heading=GHS+Classification`);
+    const propData = await propRes.json();
+
+    // Extract hazard statements
+    const sections = propData?.Record?.Section || [];
+    let hazards = [];
+    let pictograms = [];
+
+    const findInSection = (secs) => {
+      for (const sec of secs) {
+        if (sec.TOCHeading === 'GHS Classification') {
+          (sec.Section||[]).forEach(s => {
+            if (s.TOCHeading === 'Pictogram(s)') {
+              (s.Information||[]).forEach(i => {
+                (i.Value?.StringWithMarkup||[]).forEach(v => pictograms.push(v.String));
+              });
+            }
+            if (s.TOCHeading === 'Hazard Statements') {
+              (s.Information||[]).forEach(i => {
+                (i.Value?.StringWithMarkup||[]).forEach(v => hazards.push(v.String));
+              });
+            }
+          });
+        }
+        if (sec.Section) findInSection(sec.Section);
+      }
+    };
+    findInSection(sections);
+
+    // Map GHS pictograms to icons
+    const ghsIcons = {
+      'Flame': {icon:'🔥', label:'Flammable', color:'#ea580c'},
+      'Skull': {icon:'☠️', label:'Toxic', color:'#dc2626'},
+      'Exclamation': {icon:'⚠️', label:'Irritant', color:'#d97706'},
+      'Corrosion': {icon:'🧪', label:'Corrosive', color:'#7c3aed'},
+      'Health': {icon:'⚕️', label:'Health Hazard', color:'#db2777'},
+      'Environment': {icon:'🌿', label:'Environmental', color:'#059669'},
+      'Exploding': {icon:'💥', label:'Explosive', color:'#dc2626'},
+      'Oxidizer': {icon:'🔵', label:'Oxidizer', color:'#0891b2'},
+      'Gas': {icon:'💨', label:'Compressed Gas', color:'#6b7280'},
+    };
+
+    const matchedIcons = Object.entries(ghsIcons)
+      .filter(([key]) => pictograms.some(p => p.includes(key)))
+      .map(([, v]) => `<span style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;background:${v.color}22;color:${v.color};font-size:12px;font-weight:700;margin:3px;">
+        ${v.icon} ${v.label}</span>`).join('');
+
+    const hazardList = hazards.slice(0,5).map(h =>
+      `<li style="font-size:12px;color:var(--text2);margin-bottom:3px;">${escHtml(h)}</li>`).join('');
+
+    mc.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <i class="fas fa-shield-halved" style="color:var(--accent);font-size:14px;"></i>
+        <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);">Safety Info (PubChem)</span>
+        <a href="https://pubchem.ncbi.nlm.nih.gov/compound/${cid}" target="_blank"
+           style="font-size:10px;color:var(--teal);margin-left:auto;">View full →</a>
+      </div>
+      ${matchedIcons ? `<div style="margin-bottom:10px;">${matchedIcons}</div>` : ''}
+      ${hazardList ? `<ul style="padding-left:16px;">${hazardList}</ul>` : '<p style="font-size:12px;color:var(--text3);">No GHS hazard data found.</p>'}`;
+
+  } catch(e) {
+    mc.innerHTML = `<span style="font-size:12px;color:var(--text3);"><i class="fas fa-circle-info"></i> Safety data unavailable: ${e.message}</span>`;
+  }
+}
+
 // ================================================================
 // INIT
 // ================================================================
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeConfirm(); }
 });
+
+// Init dark mode on load
+initDarkMode();
 
 // ── PWA: Service Worker registration ──────────────────────────
 if ('serviceWorker' in navigator) {
