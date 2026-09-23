@@ -2552,7 +2552,6 @@ const TABS = [
   {key:'books',     label:'Books',     icon:'fa-book',       color:'#d97706'},
   {key:'students',  label:'Students',  icon:'fa-users',      color:'#db2777'},
   {key:'analytics',    label:'Analytics',   icon:'fa-chart-bar',    color:'#ea580c'},
-  {key:'publications', label:'Papers',       icon:'fa-file-lines',   color:'#0891b2'},
   {key:'activity',     label:'Activity Log', icon:'fa-clock-rotate-left', color:'#7c3aed'},
   {key:'admin',        label:'Admin',        icon:'fa-shield-halved', color:'#dc2626'}
 ];
@@ -2602,7 +2601,6 @@ function launchApp(user) {
 function renderTab(key) {
   const main = document.getElementById('main-content');
   if (key === 'analytics')    { renderAnalytics(); return; }
-  if (key === 'publications') { renderPublications(); return; }
   if (key === 'activity')     { renderActivityLog(); return; }
   if (key === 'admin')        { renderAdminPanel(); return; }
   
