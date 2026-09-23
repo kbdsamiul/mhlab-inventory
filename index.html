@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e1b4b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MH Lab">
+<link rel="manifest" href="manifest.json">
 <title>MH Lab Inventory System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -545,6 +551,7 @@ tr:hover td { background: linear-gradient(135deg, #f8faff, #f5f3ff); }
 .loading-spinner { font-size: 36px; color: white; animation: spin 1s linear infinite; }
 .loading-text { color: rgba(255,255,255,0.8); font-size: 14px; font-weight: 500; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 
 /* ── AUTH INFO ───────────────────────────────────── */
 .auth-info { background: var(--accent-light); color: var(--accent); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 16px; display: none; }
@@ -3632,6 +3639,113 @@ function closeMenu(key) {
 // ================================================================
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeConfirm(); }
+});
+
+// ── PWA: Service Worker registration ──────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/mhlab-inventory/sw.js')
+      .then(reg => {
+        console.log('SW registered');
+        // Check for updates every 60 seconds
+        setInterval(() => reg.update(), 60000);
+        // When new version available, show update banner
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner(newSW);
+            }
+          });
+        });
+      })
+      .catch(e => console.log('SW error:', e));
+  });
+}
+
+function showUpdateBanner(sw) {
+  // Create update notification
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = `
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:linear-gradient(135deg,#1e1b4b,#4338ca);
+    color:white; padding:14px 20px; border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.3);
+    display:flex; align-items:center; gap:14px;
+    font-family:var(--font); font-size:13px; font-weight:500;
+    z-index:99999; animation:slideUp .3s ease;
+    max-width:90vw;
+  `;
+  banner.innerHTML = `
+    <i class="fas fa-arrows-rotate" style="font-size:18px;color:#a5b4fc;"></i>
+    <span>New version available!</span>
+    <button onclick="applyUpdate()" style="
+      background:white;color:#1e1b4b;border:none;
+      padding:7px 16px;border-radius:8px;font-size:12px;
+      font-weight:700;cursor:pointer;font-family:var(--font);
+    ">Update Now</button>
+    <button onclick="this.parentElement.remove()" style="
+      background:none;border:none;color:rgba(255,255,255,0.6);
+      font-size:18px;cursor:pointer;padding:0;line-height:1;
+    ">×</button>
+  `;
+  document.body.appendChild(banner);
+  window._pendingSW = sw;
+}
+
+function applyUpdate() {
+  if (window._pendingSW) {
+    window._pendingSW.postMessage('SKIP_WAITING');
+    window.location.reload();
+  }
+}
+
+// ── PWA: Install prompt (Add to Home Screen) ──────────────────
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show install button after user is logged in
+  setTimeout(showInstallBtn, 3000);
+});
+
+function showInstallBtn() {
+  if (!deferredPrompt) return;
+  if (document.getElementById('install-btn')) return;
+  if (document.getElementById('app-screen').style.display === 'none') return;
+
+  const btn = document.createElement('button');
+  btn.id = 'install-btn';
+  btn.innerHTML = '<i class="fas fa-mobile-screen"></i> Install App';
+  btn.style.cssText = `
+    position:fixed; bottom:20px; right:20px;
+    background:linear-gradient(135deg,#059669,#0891b2);
+    color:white; border:none; padding:12px 18px;
+    border-radius:12px; font-size:13px; font-weight:700;
+    cursor:pointer; font-family:var(--font);
+    box-shadow:0 6px 20px rgba(5,150,105,0.4);
+    display:flex;align-items:center;gap:8px;
+    z-index:9998; animation:slideUp .3s ease;
+  `;
+  btn.onclick = async () => {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      btn.remove();
+      deferredPrompt = null;
+    }
+  };
+  document.body.appendChild(btn);
+  // Auto-hide after 8 seconds
+  setTimeout(() => btn.style.opacity = '0.5', 8000);
+}
+
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.remove();
+  deferredPrompt = null;
+  console.log('MH Lab app installed!');
 });
 
 window.addEventListener('beforeunload', e => {
